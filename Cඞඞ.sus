@@ -1,0 +1,89 @@
+// Cඞඞ (temporary name)
+// C@@ (ascii version!)
+
+// Goals:
+// - Simple procedural language like C, no RAII
+// - Manual, explicit memory management
+// - Allocator-based ecosystem, grouped lifetimes
+//   - Arenas as the foundational allocation primitive
+// - Safety and correctness nonetheless
+//   - Think about read/write references in single-threaded context
+// - Customizable static analysis
+// - Consistent metaprogramming
+//   - should just be code in every sense, meaning it should also be debuggable
+
+// Primitive number types
+// | u8 u16 u32 u64 u128 isize
+// | i8 i16 i32 i64 i128 isize
+// |    f16 f32 f64
+// What about fixed point number types?
+
+// Other primitive types: bool
+
+// Slices
+// - runtime bounds checking by default
+
+// Strings
+// primitive type: str (utf8-checked slice)
+// literals:
+// - "hello world, グッドバイ世界" - str literal
+// - c"filthy C strings :(" - zero-terminated C strings
+// - interpolation - $"hello {getUser(world)}, you're looking sus today"
+
+// Operators
+// | arithmetic: + - / * % **
+// | logic: and or xor not
+// | bitwise: & | ^
+// The logic operators are keywords instead of symbols for consistency and readability.
+// Let's avoid the footgun that comes with using ! for such an important logic operation
+
+// Declaration and initialization
+// Declare type     | pub? type :: expr
+// Declare variable | r?w? name : type? = expr
+
+// References
+// We can read and/or write from a reference
+// | &r T  – readonly  ref to T – (&T is equivalent?)
+// | &w T  – writeonly ref to T
+// | &rw T – readwrite ref to T
+// writeonly is particularly useful for allocators
+
+// built-in bitflags, but calling it bitset so that the word is not plural
+// Or maybe just packed structs? https://devlog.hexops.com/2022/packed-structs-in-zig/
+WindowFlags :: bitset u32
+{
+    Centered,
+    Resizable,
+    Maximized,
+    Transparent,
+    HighDpi,
+}
+
+// built-in enums (type-checked ADTs)
+// how can I consistently specify the tag value here?
+KeyboardEvent :: enum u8
+{
+    KeyPress   : KeyCode,
+    KeyRelease : KeyCode,
+    KeyRepeat  : KeyCode,
+    ImeCommit  : String,
+}
+
+// by default, every variant is of type ()
+ScreenMode :: enum
+{
+    Windowed,
+    Borderless,
+    Fullscreen,
+}
+
+add :: fn (a : i32, b : i32)
+{
+    a + b
+}
+
+main :: fn ()
+{
+    five := add (2, 3);
+    println "hello world"
+}
