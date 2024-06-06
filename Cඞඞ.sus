@@ -51,13 +51,13 @@
 
 // built-in bitflags, but calling it bitset so that the word is not plural
 // Or maybe just packed structs? https://devlog.hexops.com/2022/packed-structs-in-zig/
-WindowFlags :: bitset u32
+WindowFlags :: packed struct u32
 {
-    Centered,
-    Resizable,
-    Maximized,
-    Transparent,
-    HighDpi,
+    centered    : bool,
+    Resizable   : bool,
+    Maximized   : bool,
+    Transparent : bool,
+    HighDpi     : bool,
 }
 
 // built-in enums (type-checked ADTs)
@@ -88,25 +88,22 @@ ScreenMode :: enum
 // (I don't want the C-style for loops)
 // think about match statement and pattern matching later
 
-add :: fn (a : i32, b : i32)
-{
-    a + b
-}
+add :: fn(a : i32, b : i32) >- i32 -> a + b;
 
-control :: fn ()
+control :: fn() >- bool
 {
-    defer println "This will be printed last";
-    defer println "This will be printed right before last";
+    defer println("This will be printed last");
+    defer println("This will be printed right before last");
 
     if 10 + 9 == 21 and not 1 + 1 == 3 then
     {
-        println "This is correct";
+        println("This is correct");
     }
     else
     {
-        println "It's false.";
-        println "It's fiction.";
-        println "We made it up.";
+        println("It's false.");
+        println("It's fiction.");
+        println("We made it up.");
     }
 
     rw i : usize = 0;
@@ -115,13 +112,19 @@ control :: fn ()
         defer i++;
 
         if i % 2 == 0
-        then println $"It seems {i} is even."
-        else println $"It seems {i} is odd.";
+        then println($"It seems {i} is even.")
+        else println($"It seems {i} is odd.");
+    }
+
+    loop
+    {
+        out := true;
+        break out;
     }
 }
 
-main :: fn ()
+main :: fn()
 {
-    five := add (2, 3);
-    println "hello world";
+    five := add(2, 3);
+    println("hello world");
 }
