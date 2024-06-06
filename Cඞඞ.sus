@@ -27,13 +27,14 @@
 // primitive type: str (utf8-checked slice)
 // literals:
 // - "hello world, グッドバイ世界" - str literal
+// - b"byte strings!" - byte strings
 // - c"filthy C strings :(" - zero-terminated C strings
 // - interpolation - $"hello {getUser(world)}, you're looking sus today"
 
 // Operators
 // | arithmetic: + - / * % **
 // | logic: and or xor not
-// | bitwise: & | ^
+// | bitwise: & | ^ << >>
 // The logic operators are keywords instead of symbols for consistency and readability.
 // Let's avoid the footgun that comes with using ! for such an important logic operation
 
