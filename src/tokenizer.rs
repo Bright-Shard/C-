@@ -68,6 +68,13 @@ pub enum TokenType {
     Num,
 }
 
+#[derive(Debug, Clone)]
+pub struct TokenSpan<'a> {
+    pub slice: &'a str,
+    pub line: usize,
+    pub col: usize,
+}
+
 #[derive(Debug)]
 pub struct Tokens<'a> {
     /// The entire code file
@@ -75,7 +82,7 @@ pub struct Tokens<'a> {
     /// Sorted list containing the position of all line breaks
     pub line_breaks: Vec<usize>,
     /// Token spans in the code
-    pub spans: Vec<(&'a str, usize, usize)>,
+    pub spans: Vec<TokenSpan<'a>>,
     /// Respective token types
     pub types: Vec<TokenType>,
 }
@@ -90,17 +97,15 @@ impl<'a> fmt::Display for Tokens<'a> {
 
         let mut col_dwidth = 0;
         let mut type_dwidth = 0;
-        for (&ty, &(_, _, col)) in self.types.iter().zip(self.spans.iter()) {
-            col_dwidth = col_dwidth.max(log10(col));
+        for (&ty, span) in self.types.iter().zip(self.spans.iter()) {
+            col_dwidth = col_dwidth.max(log10(span.col));
             type_dwidth = type_dwidth.max(format!("{ty:?}").len());
         }
 
-        for (ty, (span_slice, line, col)) in self.types.iter().zip(self.spans.iter()) {
+        for (ty, TokenSpan { slice, line, col }) in self.types.iter().zip(self.spans.iter()) {
             writeln!(
                 f,
-                "{:>line_dwidth$}:{:<col_dwidth$}   {:<type_dwidth$}   {span_slice}",
-                line,
-                col,
+                "{line:>line_dwidth$}:{col:<col_dwidth$}   {:<type_dwidth$}   {slice}",
                 format!("{ty:?}"),
                 line_dwidth = line_dwidth,
                 col_dwidth = col_dwidth,
@@ -274,8 +279,8 @@ pub fn tokenize<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
 
             if is_operator {
                 let col = input.as_ptr() as usize - line_start;
-                let span_slice = unsafe { std::str::from_utf8_unchecked(&input[..op_len]) };
-                spans.push((span_slice, line, col));
+                let slice = unsafe { std::str::from_utf8_unchecked(&input[..op_len]) };
+                spans.push(TokenSpan { slice, line, col });
                 input = &input[op_len..];
                 continue;
             }
@@ -317,8 +322,8 @@ pub fn tokenize<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
 
                 types.push(TokenType::String);
                 let col = bcode.as_ptr() as usize + start - line_start;
-                let span_slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
-                spans.push((span_slice, line, col));
+                let slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
+                spans.push(TokenSpan { slice, line, col });
                 continue;
             } else {
                 let col = start_str_addr + 1 - line_start;
@@ -444,8 +449,8 @@ pub fn tokenize<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
                 types.push(TokenType::Ident);
             }
 
-            let span_slice = unsafe { std::str::from_utf8_unchecked(ident_slice) };
-            spans.push((span_slice, line, col));
+            let slice = unsafe { std::str::from_utf8_unchecked(ident_slice) };
+            spans.push(TokenSpan { slice, line, col });
             continue;
         }
 
@@ -474,8 +479,8 @@ pub fn tokenize<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
 
             types.push(TokenType::Num);
             let col = bcode.as_ptr() as usize + start - line_start;
-            let span_slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
-            spans.push((span_slice, line, col));
+            let slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
+            spans.push(TokenSpan { slice, line, col });
             continue;
         }
 
