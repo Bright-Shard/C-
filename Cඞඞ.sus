@@ -125,6 +125,8 @@ control :: fn() >- bool
 
 main :: fn()
 {
+    myChar := 'ඞ';
     five := add(2, 3);
     println("hello world");
+    println(myChar);
 }

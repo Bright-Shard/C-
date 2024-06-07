@@ -63,7 +63,7 @@ pub enum TokenType {
     RBrace,   // }
 
     String,
-    // Char, // 'a'
+    Char, // 'a'
     Ident,
     Num,
 }
@@ -308,11 +308,12 @@ pub fn tokenize<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
                 if input[0] == b'\n' {
                     let addr = input.as_ptr() as usize;
                     line_breaks.push(addr - start_addr);
+                    input = &input[1..];
                     line_start = input.as_ptr() as usize;
                     line += 1;
+                } else {
+                    input = &input[1..];
                 }
-
-                input = &input[1..];
             }
 
             if is_valid {
@@ -328,6 +329,52 @@ pub fn tokenize<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
             } else {
                 let col = start_str_addr + 1 - line_start;
                 panic!("{file_name}:{line}:{col}: Unfinished string");
+            }
+        }
+
+        // chars
+        if input[0] == b'\'' {
+            let mut is_valid = false;
+
+            let start_str_addr = input.as_ptr() as usize;
+            input = &input[1..];
+            while !input.is_empty() {
+                if input.starts_with(br#"\'"#) {
+                    input = &input[2..];
+                    continue;
+                }
+
+                if input[0] == b'\'' {
+                    is_valid = true;
+                    input = &input[1..];
+                    break;
+                }
+
+                // chars can handle line breaks (though they shouldn't be allowed)
+                if input[0] == b'\n' {
+                    let addr = input.as_ptr() as usize;
+                    line_breaks.push(addr - start_addr);
+                    input = &input[1..];
+                    line_start = input.as_ptr() as usize;
+                    line += 1;
+                } else {
+                    input = &input[1..];
+                }
+            }
+
+            if is_valid {
+                let end_str_addr = input.as_ptr() as usize;
+                let start = start_str_addr - start_addr;
+                let end = end_str_addr - start_addr;
+
+                types.push(TokenType::Char);
+                let col = bcode.as_ptr() as usize + start - line_start;
+                let slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
+                spans.push(TokenSpan { slice, line, col });
+                continue;
+            } else {
+                let col = start_str_addr + 1 - line_start;
+                panic!("{file_name}:{line}:{col}: Unfinished char");
             }
         }
 
