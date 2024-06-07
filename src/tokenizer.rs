@@ -179,157 +179,68 @@ pub fn tokenize(code: &str) -> Tokens<'_> {
         // operators
         {
             let mut op_len;
-            let is_valid = 'valid: {
+            let is_operator = 'op: {
                 op_len = 2;
                 if input.len() >= op_len {
-                    match &input[..op_len] {
-                        op::EQUALS => {
-                            types.push(TokenType::Equals);
-                            break 'valid true;
-                        }
-                        op::NOT_EQUALS => {
-                            types.push(TokenType::NotEquals);
-                            break 'valid true;
-                        }
-                        op::LESS_EQUAL => {
-                            types.push(TokenType::LessEqual);
-                            break 'valid true;
-                        }
-                        op::GREATER_EQUAL => {
-                            types.push(TokenType::GreaterEqual);
-                            break 'valid true;
-                        }
-                        op::FEATHER => {
-                            types.push(TokenType::Feather);
-                            break 'valid true;
-                        }
-                        op::ARROW => {
-                            types.push(TokenType::Arrow);
-                            break 'valid true;
-                        }
-                        op::L_SHIFT => {
-                            types.push(TokenType::LShift);
-                            break 'valid true;
-                        }
-                        op::R_SHIFT => {
-                            types.push(TokenType::RShift);
-                            break 'valid true;
-                        }
-                        op::INCR => {
-                            types.push(TokenType::Incr);
-                            break 'valid true;
-                        }
-                        op::DECR => {
-                            types.push(TokenType::Decr);
-                            break 'valid true;
-                        }
-                        op::POW => {
-                            types.push(TokenType::Pow);
-                            break 'valid true;
-                        }
-                        _ => {}
+                    let toktype = match &input[..op_len] {
+                        op::EQUALS => Some(TokenType::Equals),
+                        op::NOT_EQUALS => Some(TokenType::NotEquals),
+                        op::LESS_EQUAL => Some(TokenType::LessEqual),
+                        op::GREATER_EQUAL => Some(TokenType::GreaterEqual),
+                        op::FEATHER => Some(TokenType::Feather),
+                        op::ARROW => Some(TokenType::Arrow),
+                        op::L_SHIFT => Some(TokenType::LShift),
+                        op::R_SHIFT => Some(TokenType::RShift),
+                        op::INCR => Some(TokenType::Incr),
+                        op::DECR => Some(TokenType::Decr),
+                        op::POW => Some(TokenType::Pow),
+                        _ => None,
+                    };
+
+                    if let Some(toktype) = toktype {
+                        types.push(toktype);
+                        break 'op true;
                     }
                 }
 
                 op_len = 1;
                 if input.len() >= op_len {
-                    match &input[..op_len] {
-                        op::MODULO => {
-                            types.push(TokenType::Modulo);
-                            break 'valid true;
-                        }
-                        op::LESS_THAN => {
-                            types.push(TokenType::LessThan);
-                            break 'valid true;
-                        }
-                        op::GREATER_THAN => {
-                            types.push(TokenType::GreaterThan);
-                            break 'valid true;
-                        }
-                        op::AMPERSAND => {
-                            types.push(TokenType::Ampersand);
-                            break 'valid true;
-                        }
-                        op::PIPE => {
-                            types.push(TokenType::Pipe);
-                            break 'valid true;
-                        }
-                        op::CARET => {
-                            types.push(TokenType::Caret);
-                            break 'valid true;
-                        }
-                        op::TILDE => {
-                            types.push(TokenType::Tilde);
-                            break 'valid true;
-                        }
-                        op::PLUS => {
-                            types.push(TokenType::Plus);
-                            break 'valid true;
-                        }
-                        op::MINUS => {
-                            types.push(TokenType::Minus);
-                            break 'valid true;
-                        }
-                        op::MUL => {
-                            types.push(TokenType::Mul);
-                            break 'valid true;
-                        }
-                        op::DIV => {
-                            types.push(TokenType::Div);
-                            break 'valid true;
-                        }
-                        op::EQUAL => {
-                            types.push(TokenType::Equal);
-                            break 'valid true;
-                        }
-                        op::SEMI => {
-                            types.push(TokenType::Semi);
-                            break 'valid true;
-                        }
-                        op::COLON => {
-                            types.push(TokenType::Colon);
-                            break 'valid true;
-                        }
-                        op::COMMA => {
-                            types.push(TokenType::Comma);
-                            break 'valid true;
-                        }
-                        op::DOT => {
-                            types.push(TokenType::Dot);
-                            break 'valid true;
-                        }
-                        op::L_PARENS => {
-                            types.push(TokenType::LParens);
-                            break 'valid true;
-                        }
-                        op::R_PARENS => {
-                            types.push(TokenType::RParens);
-                            break 'valid true;
-                        }
-                        op::L_BRACKET => {
-                            types.push(TokenType::LBracket);
-                            break 'valid true;
-                        }
-                        op::R_BRACKET => {
-                            types.push(TokenType::RBracket);
-                            break 'valid true;
-                        }
-                        op::L_BRACE => {
-                            types.push(TokenType::LBrace);
-                            break 'valid true;
-                        }
-                        op::R_BRACE => {
-                            types.push(TokenType::RBrace);
-                            break 'valid true;
-                        }
-                        _ => {}
+                    let toktype = match &input[..op_len] {
+                        op::MODULO => Some(TokenType::Modulo),
+                        op::LESS_THAN => Some(TokenType::LessThan),
+                        op::GREATER_THAN => Some(TokenType::GreaterThan),
+                        op::AMPERSAND => Some(TokenType::Ampersand),
+                        op::PIPE => Some(TokenType::Pipe),
+                        op::CARET => Some(TokenType::Caret),
+                        op::TILDE => Some(TokenType::Tilde),
+                        op::PLUS => Some(TokenType::Plus),
+                        op::MINUS => Some(TokenType::Minus),
+                        op::MUL => Some(TokenType::Mul),
+                        op::DIV => Some(TokenType::Div),
+                        op::EQUAL => Some(TokenType::Equal),
+                        op::SEMI => Some(TokenType::Semi),
+                        op::COLON => Some(TokenType::Colon),
+                        op::COMMA => Some(TokenType::Comma),
+                        op::DOT => Some(TokenType::Dot),
+                        op::L_PARENS => Some(TokenType::LParens),
+                        op::R_PARENS => Some(TokenType::RParens),
+                        op::L_BRACKET => Some(TokenType::LBracket),
+                        op::R_BRACKET => Some(TokenType::RBracket),
+                        op::L_BRACE => Some(TokenType::LBrace),
+                        op::R_BRACE => Some(TokenType::RBrace),
+                        _ => None,
+                    };
+
+                    if let Some(toktype) = toktype {
+                        types.push(toktype);
+                        break 'op true;
                     }
                 }
 
                 false
             };
 
-            if is_valid {
+            if is_operator {
                 let col = input.as_ptr() as usize - line_start;
                 let span_slice = unsafe { std::str::from_utf8_unchecked(&input[..op_len]) };
                 spans.push((span_slice, line, col));
@@ -409,112 +320,92 @@ pub fn tokenize(code: &str) -> Tokens<'_> {
 
                 token_len = 8;
                 if ident_slice.len() >= token_len {
-                    if &ident_slice[..token_len] == kw::CONTINUE {
-                        types.push(TokenType::Continue);
+                    let toktype = if &ident_slice[..token_len] == kw::CONTINUE {
+                        Some(TokenType::Continue)
+                    } else {
+                        None
+                    };
+
+                    if let Some(toktype) = toktype {
+                        types.push(toktype);
                         break 'kw true;
                     }
                 }
 
                 token_len = 6;
                 if ident_slice.len() >= token_len {
-                    match &ident_slice[..token_len] {
-                        kw::PACKED => {
-                            types.push(TokenType::Packed);
-                            break 'kw true;
-                        }
-                        kw::STRUCT => {
-                            types.push(TokenType::Struct);
-                            break 'kw true;
-                        }
-                        _ => {}
+                    let toktype = match &ident_slice[..token_len] {
+                        kw::PACKED => Some(TokenType::Packed),
+                        kw::STRUCT => Some(TokenType::Struct),
+                        _ => None,
+                    };
+
+                    if let Some(toktype) = toktype {
+                        types.push(toktype);
+                        break 'kw true;
                     }
                 }
 
                 token_len = 5;
                 if ident_slice.len() >= token_len {
-                    match &ident_slice[..token_len] {
-                        kw::UNION => {
-                            types.push(TokenType::Union);
-                            break 'kw true;
-                        }
-                        kw::DEFER => {
-                            types.push(TokenType::Defer);
-                            break 'kw true;
-                        }
-                        kw::WHILE => {
-                            types.push(TokenType::While);
-                            break 'kw true;
-                        }
-                        kw::BREAK => {
-                            types.push(TokenType::Break);
-                            break 'kw true;
-                        }
-                        _ => {}
+                    let toktype = match &ident_slice[..token_len] {
+                        kw::UNION => Some(TokenType::Union),
+                        kw::DEFER => Some(TokenType::Defer),
+                        kw::WHILE => Some(TokenType::While),
+                        kw::BREAK => Some(TokenType::Break),
+                        _ => None,
+                    };
+
+                    if let Some(toktype) = toktype {
+                        types.push(toktype);
+                        break 'kw true;
                     }
                 }
 
                 token_len = 4;
                 if ident_slice.len() >= token_len {
-                    match &ident_slice[..token_len] {
-                        kw::ENUM => {
-                            types.push(TokenType::Enum);
-                            break 'kw true;
-                        }
-                        kw::THEN => {
-                            types.push(TokenType::Then);
-                            break 'kw true;
-                        }
-                        kw::ELSE => {
-                            types.push(TokenType::Else);
-                            break 'kw true;
-                        }
-                        kw::LOOP => {
-                            types.push(TokenType::Loop);
-                            break 'kw true;
-                        }
-                        _ => {}
+                    let toktype = match &ident_slice[..token_len] {
+                        kw::ENUM => Some(TokenType::Enum),
+                        kw::THEN => Some(TokenType::Then),
+                        kw::ELSE => Some(TokenType::Else),
+                        kw::LOOP => Some(TokenType::Loop),
+                        _ => None,
+                    };
+
+                    if let Some(toktype) = toktype {
+                        types.push(toktype);
+                        break 'kw true;
                     }
                 }
 
                 token_len = 3;
                 if ident_slice.len() >= token_len {
-                    match &ident_slice[..token_len] {
-                        kw::AND => {
-                            types.push(TokenType::And);
-                            break 'kw true;
-                        }
-                        kw::XOR => {
-                            types.push(TokenType::Xor);
-                            break 'kw true;
-                        }
-                        kw::NOT => {
-                            types.push(TokenType::Not);
-                            break 'kw true;
-                        }
-                        kw::PUB => {
-                            types.push(TokenType::Pub);
-                            break 'kw true;
-                        }
-                        _ => {}
+                    let toktype = match &ident_slice[..token_len] {
+                        kw::AND => Some(TokenType::And),
+                        kw::XOR => Some(TokenType::Xor),
+                        kw::NOT => Some(TokenType::Not),
+                        kw::PUB => Some(TokenType::Pub),
+                        _ => None,
+                    };
+
+                    if let Some(toktype) = toktype {
+                        types.push(toktype);
+                        break 'kw true;
                     }
                 }
 
                 token_len = 2;
                 if ident_slice.len() >= token_len {
-                    match &ident_slice[..token_len] {
-                        kw::OR => {
-                            types.push(TokenType::Or);
-                            break 'kw true;
-                        }
-                        kw::FN => {
-                            types.push(TokenType::Fn);
-                            break 'kw true;
-                        }
-                        kw::IF => {
-                            types.push(TokenType::If);
-                            break 'kw true;
-                        }
-                        _ => {}
+                    let toktype = match &ident_slice[..token_len] {
+                        kw::OR => Some(TokenType::Or),
+                        kw::FN => Some(TokenType::Fn),
+                        kw::IF => Some(TokenType::If),
+                        _ => None,
+                    };
+
+                    if let Some(toktype) = toktype {
+                        types.push(toktype);
+                        break 'kw true;
                     }
                 }
 
