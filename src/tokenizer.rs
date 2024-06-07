@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TokenType {
     And,
@@ -78,6 +80,38 @@ pub struct Tokens<'a> {
     pub spans: Vec<(&'a str, usize, usize)>,
     /// Respective token types
     pub types: Vec<TokenType>,
+}
+
+impl<'a> fmt::Display for Tokens<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fn log10(n: usize) -> usize {
+            (n as f64).log10().ceil() as usize
+        }
+
+        let line_dwidth = log10(self.line_breaks.len());
+
+        let mut col_dwidth = 0;
+        let mut type_dwidth = 0;
+        for (&ty, &(_, _, col)) in self.types.iter().zip(self.spans.iter()) {
+            col_dwidth = col_dwidth.max(log10(col));
+            type_dwidth = type_dwidth.max(format!("{ty:?}").len());
+        }
+
+        for (ty, (span_slice, line, col)) in self.types.iter().zip(self.spans.iter()) {
+            writeln!(
+                f,
+                "{:>line_dwidth$}:{:<col_dwidth$}   {:<type_dwidth$}   {span_slice}",
+                line,
+                col,
+                format!("{ty:?}"),
+                line_dwidth = line_dwidth,
+                col_dwidth = col_dwidth,
+                type_dwidth = type_dwidth,
+            )?;
+        }
+
+        Ok(())
+    }
 }
 
 mod kw {
