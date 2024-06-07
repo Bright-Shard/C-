@@ -287,11 +287,21 @@ pub fn tokenize<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
         }
 
         // strings
-        if input[0] == b'"' {
+        let (is_string, prefix): (bool, &[u8]) = if input.starts_with(b"b\"") {
+            (true, b"b\"")
+        } else if input.starts_with(b"c\"") {
+            (true, b"c\"")
+        } else if input[0] == b'"' {
+            (true, b"\"")
+        } else {
+            (false, b"")
+        };
+
+        if is_string {
             let mut is_valid = false;
 
             let start_str_addr = input.as_ptr() as usize;
-            input = &input[1..];
+            input =  &input[prefix.len()..];
             while !input.is_empty() {
                 if input.starts_with(br#"\""#) {
                     input = &input[2..];
@@ -333,11 +343,19 @@ pub fn tokenize<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
         }
 
         // chars
-        if input[0] == b'\'' {
+        let (is_char, prefix): (bool, &[u8]) = if input.starts_with(b"b'") {
+            (true, b"b'")
+        } else if input[0] == b'\'' {
+            (true, b"'")
+        } else {
+            (false, b"")
+        };
+
+        if is_char {
             let mut is_valid = false;
 
             let start_str_addr = input.as_ptr() as usize;
-            input = &input[1..];
+            input = &input[prefix.len()..];
             while !input.is_empty() {
                 if input.starts_with(br#"\'"#) {
                     input = &input[2..];

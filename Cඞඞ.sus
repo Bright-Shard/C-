@@ -126,6 +126,11 @@ control :: fn() >- bool
 main :: fn()
 {
     myChar := 'ඞ';
+
+    // this is invalid syntax because the UTF8 character is multi-byte
+    // Although it is a valid token
+    myInvalidByteChar := b'ඞ';
+
     five := add(2, 3);
     println("hello world");
     println(myChar);
