@@ -176,266 +176,151 @@ pub fn tokenize(code: &str) -> Tokens<'_> {
             continue;
         }
 
-        // keywords and operators
+        // operators
         {
-            let mut token_len;
-            let is_valid = 'tokens: {
-                // keywords
-
-                token_len = 8;
-                if input.len() >= token_len {
-                    if &input[..token_len] == kw::CONTINUE {
-                        types.push(TokenType::Continue);
-                        break 'tokens true;
-                    }
-                }
-
-                token_len = 6;
-                if input.len() >= token_len {
-                    match &input[..token_len] {
-                        kw::PACKED => {
-                            types.push(TokenType::Packed);
-                            break 'tokens true;
-                        }
-                        kw::STRUCT => {
-                            types.push(TokenType::Struct);
-                            break 'tokens true;
-                        }
-                        _ => {}
-                    }
-                }
-
-                token_len = 5;
-                if input.len() >= token_len {
-                    match &input[..token_len] {
-                        kw::UNION => {
-                            types.push(TokenType::Union);
-                            break 'tokens true;
-                        }
-                        kw::DEFER => {
-                            types.push(TokenType::Defer);
-                            break 'tokens true;
-                        }
-                        kw::WHILE => {
-                            types.push(TokenType::While);
-                            break 'tokens true;
-                        }
-                        kw::BREAK => {
-                            types.push(TokenType::Break);
-                            break 'tokens true;
-                        }
-                        _ => {}
-                    }
-                }
-
-                token_len = 4;
-                if input.len() >= token_len {
-                    match &input[..token_len] {
-                        kw::ENUM => {
-                            types.push(TokenType::Enum);
-                            break 'tokens true;
-                        }
-                        kw::THEN => {
-                            types.push(TokenType::Then);
-                            break 'tokens true;
-                        }
-                        kw::ELSE => {
-                            types.push(TokenType::Else);
-                            break 'tokens true;
-                        }
-                        kw::LOOP => {
-                            types.push(TokenType::Loop);
-                            break 'tokens true;
-                        }
-                        _ => {}
-                    }
-                }
-
-                token_len = 3;
-                if input.len() >= token_len {
-                    match &input[..token_len] {
-                        kw::AND => {
-                            types.push(TokenType::And);
-                            break 'tokens true;
-                        }
-                        kw::XOR => {
-                            types.push(TokenType::Xor);
-                            break 'tokens true;
-                        }
-                        kw::NOT => {
-                            types.push(TokenType::Not);
-                            break 'tokens true;
-                        }
-                        kw::PUB => {
-                            types.push(TokenType::Pub);
-                            break 'tokens true;
-                        }
-                        _ => {}
-                    }
-                }
-
-                token_len = 2;
-                if input.len() >= token_len {
-                    match &input[..token_len] {
-                        kw::OR => {
-                            types.push(TokenType::Or);
-                            break 'tokens true;
-                        }
-                        kw::FN => {
-                            types.push(TokenType::Fn);
-                            break 'tokens true;
-                        }
-                        kw::IF => {
-                            types.push(TokenType::If);
-                            break 'tokens true;
-                        }
-                        _ => {}
-                    }
-                }
-
-                // operators
-
-                token_len = 2;
-                if input.len() >= token_len {
-                    match &input[..token_len] {
+            let mut op_len;
+            let is_valid = 'valid: {
+                op_len = 2;
+                if input.len() >= op_len {
+                    match &input[..op_len] {
                         op::EQUALS => {
                             types.push(TokenType::Equals);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::NOT_EQUALS => {
                             types.push(TokenType::NotEquals);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::LESS_EQUAL => {
                             types.push(TokenType::LessEqual);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::GREATER_EQUAL => {
                             types.push(TokenType::GreaterEqual);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::FEATHER => {
                             types.push(TokenType::Feather);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::ARROW => {
                             types.push(TokenType::Arrow);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::L_SHIFT => {
                             types.push(TokenType::LShift);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::R_SHIFT => {
                             types.push(TokenType::RShift);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::INCR => {
                             types.push(TokenType::Incr);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::DECR => {
                             types.push(TokenType::Decr);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::POW => {
                             types.push(TokenType::Pow);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         _ => {}
                     }
                 }
 
-                token_len = 1;
-                if input.len() >= token_len {
-                    match &input[..token_len] {
+                op_len = 1;
+                if input.len() >= op_len {
+                    match &input[..op_len] {
                         op::MODULO => {
                             types.push(TokenType::Modulo);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::LESS_THAN => {
                             types.push(TokenType::LessThan);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::GREATER_THAN => {
                             types.push(TokenType::GreaterThan);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::AMPERSAND => {
                             types.push(TokenType::Ampersand);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::PIPE => {
                             types.push(TokenType::Pipe);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::CARET => {
                             types.push(TokenType::Caret);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::TILDE => {
                             types.push(TokenType::Tilde);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::PLUS => {
                             types.push(TokenType::Plus);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::MINUS => {
                             types.push(TokenType::Minus);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::MUL => {
                             types.push(TokenType::Mul);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::DIV => {
                             types.push(TokenType::Div);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::EQUAL => {
                             types.push(TokenType::Equal);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::SEMI => {
                             types.push(TokenType::Semi);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::COLON => {
                             types.push(TokenType::Colon);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::COMMA => {
                             types.push(TokenType::Comma);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::DOT => {
                             types.push(TokenType::Dot);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::L_PARENS => {
                             types.push(TokenType::LParens);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::R_PARENS => {
                             types.push(TokenType::RParens);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::L_BRACKET => {
                             types.push(TokenType::LBracket);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::R_BRACKET => {
                             types.push(TokenType::RBracket);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::L_BRACE => {
                             types.push(TokenType::LBrace);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         op::R_BRACE => {
                             types.push(TokenType::RBrace);
-                            break 'tokens true;
+                            break 'valid true;
                         }
                         _ => {}
                     }
@@ -446,9 +331,9 @@ pub fn tokenize(code: &str) -> Tokens<'_> {
 
             if is_valid {
                 let col = input.as_ptr() as usize - line_start;
-                let span_slice = unsafe { std::str::from_utf8_unchecked(&input[..token_len]) };
+                let span_slice = unsafe { std::str::from_utf8_unchecked(&input[..op_len]) };
                 spans.push((span_slice, line, col));
-                input = &input[token_len..];
+                input = &input[op_len..];
                 continue;
             }
         }
@@ -515,9 +400,132 @@ pub fn tokenize(code: &str) -> Tokens<'_> {
             let start = start_ident_addr - start_addr;
             let end = end_ident_addr - start_addr;
 
-            types.push(TokenType::Ident);
             let col = bcode.as_ptr() as usize + start - line_start;
-            let span_slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
+            let ident_slice = &bcode[start..end];
+
+            let mut token_len;
+            let is_keyword = 'kw: {
+                // keywords
+
+                token_len = 8;
+                if ident_slice.len() >= token_len {
+                    if &ident_slice[..token_len] == kw::CONTINUE {
+                        types.push(TokenType::Continue);
+                        break 'kw true;
+                    }
+                }
+
+                token_len = 6;
+                if ident_slice.len() >= token_len {
+                    match &ident_slice[..token_len] {
+                        kw::PACKED => {
+                            types.push(TokenType::Packed);
+                            break 'kw true;
+                        }
+                        kw::STRUCT => {
+                            types.push(TokenType::Struct);
+                            break 'kw true;
+                        }
+                        _ => {}
+                    }
+                }
+
+                token_len = 5;
+                if ident_slice.len() >= token_len {
+                    match &ident_slice[..token_len] {
+                        kw::UNION => {
+                            types.push(TokenType::Union);
+                            break 'kw true;
+                        }
+                        kw::DEFER => {
+                            types.push(TokenType::Defer);
+                            break 'kw true;
+                        }
+                        kw::WHILE => {
+                            types.push(TokenType::While);
+                            break 'kw true;
+                        }
+                        kw::BREAK => {
+                            types.push(TokenType::Break);
+                            break 'kw true;
+                        }
+                        _ => {}
+                    }
+                }
+
+                token_len = 4;
+                if ident_slice.len() >= token_len {
+                    match &ident_slice[..token_len] {
+                        kw::ENUM => {
+                            types.push(TokenType::Enum);
+                            break 'kw true;
+                        }
+                        kw::THEN => {
+                            types.push(TokenType::Then);
+                            break 'kw true;
+                        }
+                        kw::ELSE => {
+                            types.push(TokenType::Else);
+                            break 'kw true;
+                        }
+                        kw::LOOP => {
+                            types.push(TokenType::Loop);
+                            break 'kw true;
+                        }
+                        _ => {}
+                    }
+                }
+
+                token_len = 3;
+                if ident_slice.len() >= token_len {
+                    match &ident_slice[..token_len] {
+                        kw::AND => {
+                            types.push(TokenType::And);
+                            break 'kw true;
+                        }
+                        kw::XOR => {
+                            types.push(TokenType::Xor);
+                            break 'kw true;
+                        }
+                        kw::NOT => {
+                            types.push(TokenType::Not);
+                            break 'kw true;
+                        }
+                        kw::PUB => {
+                            types.push(TokenType::Pub);
+                            break 'kw true;
+                        }
+                        _ => {}
+                    }
+                }
+
+                token_len = 2;
+                if ident_slice.len() >= token_len {
+                    match &ident_slice[..token_len] {
+                        kw::OR => {
+                            types.push(TokenType::Or);
+                            break 'kw true;
+                        }
+                        kw::FN => {
+                            types.push(TokenType::Fn);
+                            break 'kw true;
+                        }
+                        kw::IF => {
+                            types.push(TokenType::If);
+                            break 'kw true;
+                        }
+                        _ => {}
+                    }
+                }
+
+                false
+            };
+
+            if !is_keyword {
+                types.push(TokenType::Ident);
+            }
+
+            let span_slice = unsafe { std::str::from_utf8_unchecked(ident_slice) };
             spans.push((span_slice, line, col));
             continue;
         }
