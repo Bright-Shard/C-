@@ -112,8 +112,8 @@ control :: fn() >- bool
         defer i++;
 
         if i % 2 == 0
-        then println($"It seems {i} is even.")
-        else println($"It seems {i} is odd.");
+        then println("It seems {i} is even.")
+        else println("It seems {i} is odd.");
     }
 
     loop
