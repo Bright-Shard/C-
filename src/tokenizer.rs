@@ -2,70 +2,68 @@ use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TokenType {
-    And,
-    Or,
-    Xor,
-    Not,
+    And, // and
+    Or,  // or
+    Xor, // xor
+    Not, // not
 
-    Equals,
-    NotEquals,
-    LessThan,
-    GreaterThan,
-    LessEqual,
-    GreaterEqual,
+    Equals,       // ==
+    NotEquals,    // !=
+    LessThan,     // <
+    GreaterThan,  // >
+    LessEqual,    // <=
+    GreaterEqual, // >=
 
-    /// `>-`
-    Feather,
-    /// `->`
-    Arrow,
+    Feather, // >-
+    Arrow,   // ->
 
-    Ampersand,
-    Pipe,
-    Caret,
-    Tilde,
-    LShift,
-    RShift,
+    Ampersand, // &
+    Pipe,      // |
+    Caret,     // ^
+    Tilde,     // ~
+    LShift,    // <<
+    RShift,    // >>
 
-    Incr,
-    Decr,
-    Plus,
-    Minus,
-    Mul,
-    Div,
-    Pow,
-    Modulo,
+    Incr,   // ++
+    Decr,   // --
+    Plus,   // +
+    Minus,  // -
+    Mul,    // *
+    Div,    // /
+    Pow,    // **
+    Modulo, // %
 
-    Pub,
+    Pub, // pub
 
-    Packed,
-    Struct,
-    Enum,
-    Union,
+    Packed, // packed
+    Struct, // struct
+    Enum,   // enum
+    Union,  // union
 
-    Fn,
-    Defer,
-    If,
-    Then,
-    Else,
-    While,
-    Loop,
-    Continue,
-    Break,
+    Fn,       // fn
+    Defer,    // defer
+    If,       // if
+    Then,     // then
+    Else,     // else
+    While,    // while
+    Loop,     // loop
+    Continue, // continue
+    Break,    // break
 
-    Equal,
-    Semi,
-    Colon,
-    Comma,
-    Dot,
-    LParens,
-    RParens,
-    LBracket,
-    RBracket,
-    LBrace,
-    RBrace,
+    Equal,    // =
+    Semi,     // ;
+    Colon,    // :
+    Comma,    // ,
+    Dot,      // .
+    LParens,  // (
+    RParens,  // )
+    LBracket, // [
+    RBracket, // ]
+    LBrace,   // {
+    RBrace,   // }
 
     String,
-    // Char,
+    // Char, // 'a'
     Ident,
     Num,
 }
@@ -171,7 +169,7 @@ mod op {
     pub const R_BRACE: &[u8] = b"}";
 }
 
-pub fn tokenize(code: &str) -> Tokens<'_> {
+pub fn tokenize<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
     let mut line = 1;
     let mut line_start = code.as_ptr() as usize;
 
@@ -323,12 +321,8 @@ pub fn tokenize(code: &str) -> Tokens<'_> {
                 spans.push((span_slice, line, col));
                 continue;
             } else {
-                let start = start_str_addr - start_addr;
-                let end = bcode.len().min(start + 20);
-                panic!(
-                    "Unfinished string at line {line} ({:?})",
-                    std::str::from_utf8(&bcode[start..end])
-                );
+                let col = start_str_addr + 1 - line_start;
+                panic!("{file_name}:{line}:{col}: Unfinished string");
             }
         }
 
@@ -485,10 +479,9 @@ pub fn tokenize(code: &str) -> Tokens<'_> {
             continue;
         }
 
-        panic!(
-            "Cannot parse token at line {line} ({:?})",
-            std::str::from_utf8(&input[..(input.len().min(20))]).unwrap()
-        );
+        let start_str_addr = input.as_ptr() as usize;
+        let col = start_str_addr + 1 - line_start;
+        panic!("{file_name}:{line}:{col}: Cannot parse token");
     }
 
     Tokens {
