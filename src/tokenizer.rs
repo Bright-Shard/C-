@@ -46,6 +46,7 @@ pub enum TokenType {
     Then,     // then
     Else,     // else
     While,    // while
+    Do,       // do
     Loop,     // loop
     Continue, // continue
     Break,    // break
@@ -136,6 +137,7 @@ mod kw {
     pub const OR: &[u8] = b"or";
     pub const FN: &[u8] = b"fn";
     pub const IF: &[u8] = b"if";
+    pub const DO: &[u8] = b"do";
 }
 
 mod op {
@@ -498,6 +500,7 @@ pub fn tokenize<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
                         kw::OR => Some(TokenType::Or),
                         kw::FN => Some(TokenType::Fn),
                         kw::IF => Some(TokenType::If),
+                        kw::DO => Some(TokenType::Do),
                         _ => None,
                     };
 
