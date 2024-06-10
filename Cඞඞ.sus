@@ -103,7 +103,7 @@ control :: fn() >- bool
     {
         println("It's false.");
         println("It's fiction.");
-        println("We made it up.");
+        println($"We made it up.");
     }
 
     rw i : usize = 0;
