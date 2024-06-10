@@ -64,6 +64,9 @@ pub enum TokenType {
     RBrace,   // }
 
     String,
+    StringInterpBeg,
+    StringInterpMid,
+    StringInterpEnd,
     Char, // 'a'
     Ident,
     Num,
@@ -313,7 +316,86 @@ fn consume_token<'a>(
         }
     }
 
-    // todo: interpolated strings
+    // interpolated strings
+    if input.starts_with(b"$\"") {
+        let mut is_valid = false;
+
+        let mut start_str_addr = input.as_ptr() as usize;
+        input = &input[2..];
+
+        let mut has_interpolation = false;
+        while !input.is_empty() {
+            if input.starts_with(br#"\""#) || input.starts_with(br#"\{"#) {
+                input = &input[2..];
+                continue;
+            }
+
+            if input[0] == b'"' {
+                // end of string
+
+                is_valid = true;
+                input = &input[1..];
+
+                let end_str_addr = input.as_ptr() as usize;
+                let start = start_str_addr - start_addr;
+                let end = end_str_addr - start_addr;
+
+                tokens.types.push(match has_interpolation {
+                    true => TokenType::StringInterpEnd,
+                    false => TokenType::String,
+                });
+                let col = bcode.as_ptr() as usize + start - *line_start;
+                let slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
+                tokens.spans.push(TokenSpan::new(slice, *line, col));
+                break;
+            } else if input[0] == b'{' {
+                // inside interpolated expression (we can consume tokens recursively)
+
+                input = &input[1..];
+
+                let end_str_addr = input.as_ptr() as usize;
+                let start = start_str_addr - start_addr;
+                let end = end_str_addr - start_addr;
+
+                tokens.types.push(match has_interpolation {
+                    true => TokenType::StringInterpMid,
+                    false => TokenType::StringInterpBeg,
+                });
+                let col = bcode.as_ptr() as usize + start - *line_start;
+                let slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
+                tokens.spans.push(TokenSpan::new(slice, *line, col));
+
+                has_interpolation = true;
+
+                while !input.is_empty() && input[0] != b'}' {
+                    input = consume_token(file_name, input, line, line_start, tokens);
+                }
+                if input.is_empty() {
+                    break;
+                }
+
+                start_str_addr = input.as_ptr() as usize;
+                input = &input[1..];
+            } else if input[0] == b'\n' {
+                // strings support line breaks
+
+                let addr = input.as_ptr() as usize;
+                tokens.line_breaks.push(addr - start_addr);
+                input = &input[1..];
+                *line_start = input.as_ptr() as usize;
+                *line += 1;
+            } else {
+                input = &input[1..];
+            }
+        }
+
+        if is_valid {
+            return input;
+        } else {
+            let col = start_str_addr + 1 - *line_start;
+            panic!("{file_name}:{line}:{col}: Unfinished interpolated string");
+        }
+    }
 
     // strings
     // todo: raw strings (like in Rust)

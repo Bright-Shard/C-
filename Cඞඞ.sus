@@ -133,6 +133,8 @@ main :: fn()
     myInvalidByteChar := b'ඞ';
 
     five := add(0x02, 0b0011);
-    println("hello world");
+    println($"hello world, {myChar}!");
+    println($"5 + 7 = {five + 7}");
+    println($"Nested {($"interpolated string {$"of {floatOfDoom}"} to")} flex");
     println(myChar);
 }
