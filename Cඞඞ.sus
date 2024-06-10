@@ -112,8 +112,8 @@ control :: fn() >- bool
         defer i++;
 
         if i % 2 == 0
-        then println("It seems {i} is even.")
-        else println("It seems {i} is odd.");
+        then println($"It seems {i} is even.")
+        else println($"It seems {i} is odd.");
     }
 
     loop
@@ -134,7 +134,7 @@ main :: fn()
 
     five := add(0x02, 0b0011);
     println($"hello world, {myChar}!");
-    println($"5 + 7 = {five + 7}");
+    println($"5 + 2 + 7 = {five + { 2 } + 7}");
     println($"Nested {($"interpolated string {$"of {floatOfDoom}"} to")} flex");
     println(myChar);
 }

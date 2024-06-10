@@ -206,6 +206,11 @@ pub fn tokenize<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
     tokens
 }
 
+/// Consume - in most cases - a single token.
+/// 
+/// Exceptions are made for special nestings, like interpolated strings and
+/// pairs of tokens that indicate a beginning and an end like parentheses,
+/// in which case it will recurse.
 fn consume_token<'a>(
     file_name: &str,
     mut input: &'a [u8],
@@ -224,7 +229,6 @@ fn consume_token<'a>(
         *line_start = input.as_ptr() as usize;
         *line += 1;
     }
-
     if input.is_empty() {
         return input;
     }
@@ -632,7 +636,7 @@ fn consume_token<'a>(
         return input;
     }
 
-    // ints
+    // numbers
     if input[0].is_ascii_digit() {
         let start_ident_addr = input.as_ptr() as usize;
 
@@ -692,6 +696,39 @@ fn consume_token<'a>(
         let slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
         tokens.spans.push(TokenSpan::new(slice, *line, col));
         return input;
+    }
+
+    // Special recursions (parentheses, etc.)
+    if input[0] == b'(' {
+        let start_str_addr = input.as_ptr() as usize;
+        
+        while !input.is_empty() && input[0] != b')' {
+            input = consume_token(file_name, input, line, line_start, tokens);
+        }
+        if input.is_empty() {
+            let col = start_str_addr + 1 - *line_start;
+            panic!("{file_name}:{line}:{col}: Unclosed parenthesis");
+        }
+    } else if input[0] == b'[' {
+        let start_str_addr = input.as_ptr() as usize;
+        
+        while !input.is_empty() && input[0] != b']' {
+            input = consume_token(file_name, input, line, line_start, tokens);
+        }
+        if input.is_empty() {
+            let col = start_str_addr + 1 - *line_start;
+            panic!("{file_name}:{line}:{col}: Unclosed bracket");
+        }
+    } else if input[0] == b'{' {
+        let start_str_addr = input.as_ptr() as usize;
+        
+        while !input.is_empty() && input[0] != b'}' {
+            input = consume_token(file_name, input, line, line_start, tokens);
+        }
+        if input.is_empty() {
+            let col = start_str_addr + 1 - *line_start;
+            panic!("{file_name}:{line}:{col}: Unclosed brace");
+        }
     }
 
     let start_str_addr = input.as_ptr() as usize;
