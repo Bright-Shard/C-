@@ -76,6 +76,13 @@ pub struct TokenSpan<'a> {
     pub col: usize,
 }
 
+impl<'a> TokenSpan<'a> {
+    #[inline]
+    pub const fn new(slice: &'a str, line: usize, col: usize) -> Self {
+        Self { slice, line, col }
+    }
+}
+
 #[derive(Debug)]
 pub struct Tokens<'a> {
     /// The entire code file
@@ -180,419 +187,432 @@ pub fn tokenize<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
     let mut line = 1;
     let mut line_start = code.as_ptr() as usize;
 
-    let mut line_breaks = Vec::new();
-    let mut spans = Vec::new();
-    let mut types = Vec::new();
+    let mut tokens = Tokens {
+        code,
+        line_breaks: Vec::new(),
+        spans: Vec::new(),
+        types: Vec::new(),
+    };
 
-    let bcode = code.as_bytes();
-    let start_addr = bcode.as_ptr() as usize;
+    let bcode = tokens.code.as_bytes();
     let mut input = bcode;
     while !input.is_empty() {
-        // save line breaks
-        while !input.is_empty() && input[0] == b'\n' {
-            let addr = input.as_ptr() as usize;
-            line_breaks.push(addr - start_addr);
+        input = consume_token(file_name, input, &mut line, &mut line_start, &mut tokens);
+    }
+
+    tokens
+}
+
+fn consume_token<'a>(
+    file_name: &str,
+    mut input: &'a [u8],
+    line: &mut usize,
+    line_start: &mut usize,
+    tokens: &mut Tokens<'a>,
+) -> &'a [u8] {
+    let bcode = tokens.code.as_bytes();
+    let start_addr = bcode.as_ptr() as usize;
+
+    // save line breaks
+    while !input.is_empty() && input[0] == b'\n' {
+        let addr = input.as_ptr() as usize;
+        tokens.line_breaks.push(addr - start_addr);
+        input = &input[1..];
+        *line_start = input.as_ptr() as usize;
+        *line += 1;
+    }
+
+    if input.is_empty() {
+        return input;
+    }
+
+    // ignore whitespace
+    while input[0].is_ascii_whitespace() {
+        input = &input[1..];
+    }
+
+    // ignore comments
+    if input.starts_with(b"//") {
+        input = &input[2..];
+        while input[0] != b'\n' {
             input = &input[1..];
-            line_start = input.as_ptr() as usize;
-            line += 1;
+        }
+        return input;
+    }
+
+    // operators
+    {
+        let mut op_len;
+        let is_operator = 'op: {
+            op_len = 2;
+            if input.len() >= op_len {
+                let toktype = match &input[..op_len] {
+                    op::EQUALS => Some(TokenType::Equals),
+                    op::NOT_EQUALS => Some(TokenType::NotEquals),
+                    op::LESS_EQUAL => Some(TokenType::LessEqual),
+                    op::GREATER_EQUAL => Some(TokenType::GreaterEqual),
+                    op::FEATHER => Some(TokenType::Feather),
+                    op::ARROW => Some(TokenType::Arrow),
+                    op::L_SHIFT => Some(TokenType::LShift),
+                    op::R_SHIFT => Some(TokenType::RShift),
+                    op::INCR => Some(TokenType::Incr),
+                    op::DECR => Some(TokenType::Decr),
+                    op::POW => Some(TokenType::Pow),
+                    _ => None,
+                };
+
+                if let Some(toktype) = toktype {
+                    tokens.types.push(toktype);
+                    break 'op true;
+                }
+            }
+
+            op_len = 1;
+            if input.len() >= op_len {
+                let toktype = match &input[..op_len] {
+                    op::MODULO => Some(TokenType::Modulo),
+                    op::LESS_THAN => Some(TokenType::LessThan),
+                    op::GREATER_THAN => Some(TokenType::GreaterThan),
+                    op::AMPERSAND => Some(TokenType::Ampersand),
+                    op::PIPE => Some(TokenType::Pipe),
+                    op::CARET => Some(TokenType::Caret),
+                    op::TILDE => Some(TokenType::Tilde),
+                    op::PLUS => Some(TokenType::Plus),
+                    op::MINUS => Some(TokenType::Minus),
+                    op::MUL => Some(TokenType::Mul),
+                    op::DIV => Some(TokenType::Div),
+                    op::EQUAL => Some(TokenType::Equal),
+                    op::SEMI => Some(TokenType::Semi),
+                    op::COLON => Some(TokenType::Colon),
+                    op::COMMA => Some(TokenType::Comma),
+                    op::DOT => Some(TokenType::Dot),
+                    op::L_PARENS => Some(TokenType::LParens),
+                    op::R_PARENS => Some(TokenType::RParens),
+                    op::L_BRACKET => Some(TokenType::LBracket),
+                    op::R_BRACKET => Some(TokenType::RBracket),
+                    op::L_BRACE => Some(TokenType::LBrace),
+                    op::R_BRACE => Some(TokenType::RBrace),
+                    _ => None,
+                };
+
+                if let Some(toktype) = toktype {
+                    tokens.types.push(toktype);
+                    break 'op true;
+                }
+            }
+
+            false
+        };
+
+        if is_operator {
+            let col = input.as_ptr() as usize - *line_start;
+            let slice = unsafe { std::str::from_utf8_unchecked(&input[..op_len]) };
+            tokens.spans.push(TokenSpan::new(slice, *line, col));
+            input = &input[op_len..];
+            return input;
+        }
+    }
+
+    // todo: interpolated strings
+
+    // strings
+    // todo: raw strings (like in Rust)
+    let (is_string, prefix): (bool, &[u8]) = if input.starts_with(b"b\"") {
+        (true, b"b\"")
+    } else if input.starts_with(b"c\"") {
+        (true, b"c\"")
+    } else if input[0] == b'"' {
+        (true, b"\"")
+    } else {
+        (false, b"")
+    };
+
+    if is_string {
+        let mut is_valid = false;
+
+        let start_str_addr = input.as_ptr() as usize;
+        input = &input[prefix.len()..];
+        while !input.is_empty() {
+            if input.starts_with(br#"\""#) {
+                input = &input[2..];
+                continue;
+            }
+
+            if input[0] == b'"' {
+                is_valid = true;
+                input = &input[1..];
+                break;
+            }
+
+            // strings support line breaks
+            if input[0] == b'\n' {
+                let addr = input.as_ptr() as usize;
+                tokens.line_breaks.push(addr - start_addr);
+                input = &input[1..];
+                *line_start = input.as_ptr() as usize;
+                *line += 1;
+            } else {
+                input = &input[1..];
+            }
         }
 
-        if input.is_empty() {
-            break;
+        if is_valid {
+            let end_str_addr = input.as_ptr() as usize;
+            let start = start_str_addr - start_addr;
+            let end = end_str_addr - start_addr;
+
+            tokens.types.push(TokenType::String);
+            let col = bcode.as_ptr() as usize + start - *line_start;
+            let slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
+            tokens.spans.push(TokenSpan::new(slice, *line, col));
+            return input;
+        } else {
+            let col = start_str_addr + 1 - *line_start;
+            panic!("{file_name}:{line}:{col}: Unfinished string");
+        }
+    }
+
+    // chars
+    let (is_char, prefix): (bool, &[u8]) = if input.starts_with(b"b'") {
+        (true, b"b'")
+    } else if input[0] == b'\'' {
+        (true, b"'")
+    } else {
+        (false, b"")
+    };
+
+    if is_char {
+        let mut is_valid = false;
+
+        let start_str_addr = input.as_ptr() as usize;
+        input = &input[prefix.len()..];
+        while !input.is_empty() {
+            if input.starts_with(br#"\'"#) {
+                input = &input[2..];
+                continue;
+            }
+
+            if input[0] == b'\'' {
+                is_valid = true;
+                input = &input[1..];
+                break;
+            }
+
+            // chars can handle line breaks (though they shouldn't be allowed)
+            if input[0] == b'\n' {
+                let addr = input.as_ptr() as usize;
+                tokens.line_breaks.push(addr - start_addr);
+                input = &input[1..];
+                *line_start = input.as_ptr() as usize;
+                *line += 1;
+            } else {
+                input = &input[1..];
+            }
         }
 
-        // ignore whitespace
-        while input[0].is_ascii_whitespace() {
+        if is_valid {
+            let end_str_addr = input.as_ptr() as usize;
+            let start = start_str_addr - start_addr;
+            let end = end_str_addr - start_addr;
+
+            tokens.types.push(TokenType::Char);
+            let col = bcode.as_ptr() as usize + start - *line_start;
+            let slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
+            tokens.spans.push(TokenSpan::new(slice, *line, col));
+            return input;
+        } else {
+            let col = start_str_addr + 1 - *line_start;
+            panic!("{file_name}:{line}:{col}: Unfinished char");
+        }
+    }
+
+    // identifiers
+    if matches!(input[0], b'_' | b'A'..=b'Z' | b'a'..=b'z') {
+        let start_ident_addr = input.as_ptr() as usize;
+
+        input = &input[1..];
+        while matches!(input[0], b'_' | b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9') {
             input = &input[1..];
         }
 
-        // ignore comments
-        if input.starts_with(b"//") {
+        let end_ident_addr = input.as_ptr() as usize;
+        let start = start_ident_addr - start_addr;
+        let end = end_ident_addr - start_addr;
+
+        let col = bcode.as_ptr() as usize + start - *line_start;
+        let ident_slice = &bcode[start..end];
+
+        let mut token_len;
+        let is_keyword = 'kw: {
+            // keywords
+
+            token_len = 8;
+            if ident_slice.len() >= token_len {
+                let toktype = if &ident_slice[..token_len] == kw::CONTINUE {
+                    Some(TokenType::Continue)
+                } else {
+                    None
+                };
+
+                if let Some(toktype) = toktype {
+                    tokens.types.push(toktype);
+                    break 'kw true;
+                }
+            }
+
+            token_len = 6;
+            if ident_slice.len() >= token_len {
+                let toktype = match &ident_slice[..token_len] {
+                    kw::PACKED => Some(TokenType::Packed),
+                    kw::STRUCT => Some(TokenType::Struct),
+                    _ => None,
+                };
+
+                if let Some(toktype) = toktype {
+                    tokens.types.push(toktype);
+                    break 'kw true;
+                }
+            }
+
+            token_len = 5;
+            if ident_slice.len() >= token_len {
+                let toktype = match &ident_slice[..token_len] {
+                    kw::UNION => Some(TokenType::Union),
+                    kw::DEFER => Some(TokenType::Defer),
+                    kw::WHILE => Some(TokenType::While),
+                    kw::BREAK => Some(TokenType::Break),
+                    _ => None,
+                };
+
+                if let Some(toktype) = toktype {
+                    tokens.types.push(toktype);
+                    break 'kw true;
+                }
+            }
+
+            token_len = 4;
+            if ident_slice.len() >= token_len {
+                let toktype = match &ident_slice[..token_len] {
+                    kw::ENUM => Some(TokenType::Enum),
+                    kw::THEN => Some(TokenType::Then),
+                    kw::ELSE => Some(TokenType::Else),
+                    kw::LOOP => Some(TokenType::Loop),
+                    _ => None,
+                };
+
+                if let Some(toktype) = toktype {
+                    tokens.types.push(toktype);
+                    break 'kw true;
+                }
+            }
+
+            token_len = 3;
+            if ident_slice.len() >= token_len {
+                let toktype = match &ident_slice[..token_len] {
+                    kw::AND => Some(TokenType::And),
+                    kw::XOR => Some(TokenType::Xor),
+                    kw::NOT => Some(TokenType::Not),
+                    kw::PUB => Some(TokenType::Pub),
+                    _ => None,
+                };
+
+                if let Some(toktype) = toktype {
+                    tokens.types.push(toktype);
+                    break 'kw true;
+                }
+            }
+
+            token_len = 2;
+            if ident_slice.len() >= token_len {
+                let toktype = match &ident_slice[..token_len] {
+                    kw::OR => Some(TokenType::Or),
+                    kw::FN => Some(TokenType::Fn),
+                    kw::IF => Some(TokenType::If),
+                    kw::DO => Some(TokenType::Do),
+                    _ => None,
+                };
+
+                if let Some(toktype) = toktype {
+                    tokens.types.push(toktype);
+                    break 'kw true;
+                }
+            }
+
+            false
+        };
+
+        if !is_keyword {
+            tokens.types.push(TokenType::Ident);
+        }
+
+        let slice = unsafe { std::str::from_utf8_unchecked(ident_slice) };
+        tokens.spans.push(TokenSpan::new(slice, *line, col));
+        return input;
+    }
+
+    // ints
+    if input[0].is_ascii_digit() {
+        let start_ident_addr = input.as_ptr() as usize;
+
+        if input.starts_with(b"0x") {
+            // hex literals
             input = &input[2..];
-            while input[0] != b'\n' {
+            while matches!(input[0], b'_' | b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F') {
                 input = &input[1..];
             }
-            continue;
-        }
-
-        // operators
-        {
-            let mut op_len;
-            let is_operator = 'op: {
-                op_len = 2;
-                if input.len() >= op_len {
-                    let toktype = match &input[..op_len] {
-                        op::EQUALS => Some(TokenType::Equals),
-                        op::NOT_EQUALS => Some(TokenType::NotEquals),
-                        op::LESS_EQUAL => Some(TokenType::LessEqual),
-                        op::GREATER_EQUAL => Some(TokenType::GreaterEqual),
-                        op::FEATHER => Some(TokenType::Feather),
-                        op::ARROW => Some(TokenType::Arrow),
-                        op::L_SHIFT => Some(TokenType::LShift),
-                        op::R_SHIFT => Some(TokenType::RShift),
-                        op::INCR => Some(TokenType::Incr),
-                        op::DECR => Some(TokenType::Decr),
-                        op::POW => Some(TokenType::Pow),
-                        _ => None,
-                    };
-
-                    if let Some(toktype) = toktype {
-                        types.push(toktype);
-                        break 'op true;
-                    }
-                }
-
-                op_len = 1;
-                if input.len() >= op_len {
-                    let toktype = match &input[..op_len] {
-                        op::MODULO => Some(TokenType::Modulo),
-                        op::LESS_THAN => Some(TokenType::LessThan),
-                        op::GREATER_THAN => Some(TokenType::GreaterThan),
-                        op::AMPERSAND => Some(TokenType::Ampersand),
-                        op::PIPE => Some(TokenType::Pipe),
-                        op::CARET => Some(TokenType::Caret),
-                        op::TILDE => Some(TokenType::Tilde),
-                        op::PLUS => Some(TokenType::Plus),
-                        op::MINUS => Some(TokenType::Minus),
-                        op::MUL => Some(TokenType::Mul),
-                        op::DIV => Some(TokenType::Div),
-                        op::EQUAL => Some(TokenType::Equal),
-                        op::SEMI => Some(TokenType::Semi),
-                        op::COLON => Some(TokenType::Colon),
-                        op::COMMA => Some(TokenType::Comma),
-                        op::DOT => Some(TokenType::Dot),
-                        op::L_PARENS => Some(TokenType::LParens),
-                        op::R_PARENS => Some(TokenType::RParens),
-                        op::L_BRACKET => Some(TokenType::LBracket),
-                        op::R_BRACKET => Some(TokenType::RBracket),
-                        op::L_BRACE => Some(TokenType::LBrace),
-                        op::R_BRACE => Some(TokenType::RBrace),
-                        _ => None,
-                    };
-
-                    if let Some(toktype) = toktype {
-                        types.push(toktype);
-                        break 'op true;
-                    }
-                }
-
-                false
-            };
-
-            if is_operator {
-                let col = input.as_ptr() as usize - line_start;
-                let slice = unsafe { std::str::from_utf8_unchecked(&input[..op_len]) };
-                spans.push(TokenSpan { slice, line, col });
-                input = &input[op_len..];
-                continue;
+        } else if input.starts_with(b"0o") {
+            // octal literals
+            input = &input[2..];
+            while matches!(input[0], b'_' | b'0'..=b'7') {
+                input = &input[1..];
             }
-        }
-
-        // strings
-        let (is_string, prefix): (bool, &[u8]) = if input.starts_with(b"b\"") {
-            (true, b"b\"")
-        } else if input.starts_with(b"c\"") {
-            (true, b"c\"")
-        } else if input[0] == b'"' {
-            (true, b"\"")
+        } else if input.starts_with(b"0b") {
+            // binary literals
+            input = &input[2..];
+            while matches!(input[0], b'_' | b'0'..=b'1') {
+                input = &input[1..];
+            }
         } else {
-            (false, b"")
-        };
+            // decimal and floating literals
 
-        if is_string {
-            let mut is_valid = false;
-
-            let start_str_addr = input.as_ptr() as usize;
-            input = &input[prefix.len()..];
-            while !input.is_empty() {
-                if input.starts_with(br#"\""#) {
-                    input = &input[2..];
-                    continue;
-                }
-
-                if input[0] == b'"' {
-                    is_valid = true;
-                    input = &input[1..];
-                    break;
-                }
-
-                // strings support line breaks
-                if input[0] == b'\n' {
-                    let addr = input.as_ptr() as usize;
-                    line_breaks.push(addr - start_addr);
-                    input = &input[1..];
-                    line_start = input.as_ptr() as usize;
-                    line += 1;
-                } else {
-                    input = &input[1..];
-                }
-            }
-
-            if is_valid {
-                let end_str_addr = input.as_ptr() as usize;
-                let start = start_str_addr - start_addr;
-                let end = end_str_addr - start_addr;
-
-                types.push(TokenType::String);
-                let col = bcode.as_ptr() as usize + start - line_start;
-                let slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
-                spans.push(TokenSpan { slice, line, col });
-                continue;
-            } else {
-                let col = start_str_addr + 1 - line_start;
-                panic!("{file_name}:{line}:{col}: Unfinished string");
-            }
-        }
-
-        // chars
-        let (is_char, prefix): (bool, &[u8]) = if input.starts_with(b"b'") {
-            (true, b"b'")
-        } else if input[0] == b'\'' {
-            (true, b"'")
-        } else {
-            (false, b"")
-        };
-
-        if is_char {
-            let mut is_valid = false;
-
-            let start_str_addr = input.as_ptr() as usize;
-            input = &input[prefix.len()..];
-            while !input.is_empty() {
-                if input.starts_with(br#"\'"#) {
-                    input = &input[2..];
-                    continue;
-                }
-
-                if input[0] == b'\'' {
-                    is_valid = true;
-                    input = &input[1..];
-                    break;
-                }
-
-                // chars can handle line breaks (though they shouldn't be allowed)
-                if input[0] == b'\n' {
-                    let addr = input.as_ptr() as usize;
-                    line_breaks.push(addr - start_addr);
-                    input = &input[1..];
-                    line_start = input.as_ptr() as usize;
-                    line += 1;
-                } else {
-                    input = &input[1..];
-                }
-            }
-
-            if is_valid {
-                let end_str_addr = input.as_ptr() as usize;
-                let start = start_str_addr - start_addr;
-                let end = end_str_addr - start_addr;
-
-                types.push(TokenType::Char);
-                let col = bcode.as_ptr() as usize + start - line_start;
-                let slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
-                spans.push(TokenSpan { slice, line, col });
-                continue;
-            } else {
-                let col = start_str_addr + 1 - line_start;
-                panic!("{file_name}:{line}:{col}: Unfinished char");
-            }
-        }
-
-        // identifiers
-        if matches!(input[0], b'_' | b'A'..=b'Z' | b'a'..=b'z') {
-            let start_ident_addr = input.as_ptr() as usize;
-
+            // whole part
             input = &input[1..];
-            while matches!(input[0], b'_' | b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9') {
+            while matches!(input[0], b'_' | b'0'..=b'9') {
                 input = &input[1..];
             }
 
-            let end_ident_addr = input.as_ptr() as usize;
-            let start = start_ident_addr - start_addr;
-            let end = end_ident_addr - start_addr;
-
-            let col = bcode.as_ptr() as usize + start - line_start;
-            let ident_slice = &bcode[start..end];
-
-            let mut token_len;
-            let is_keyword = 'kw: {
-                // keywords
-
-                token_len = 8;
-                if ident_slice.len() >= token_len {
-                    let toktype = if &ident_slice[..token_len] == kw::CONTINUE {
-                        Some(TokenType::Continue)
-                    } else {
-                        None
-                    };
-
-                    if let Some(toktype) = toktype {
-                        types.push(toktype);
-                        break 'kw true;
-                    }
-                }
-
-                token_len = 6;
-                if ident_slice.len() >= token_len {
-                    let toktype = match &ident_slice[..token_len] {
-                        kw::PACKED => Some(TokenType::Packed),
-                        kw::STRUCT => Some(TokenType::Struct),
-                        _ => None,
-                    };
-
-                    if let Some(toktype) = toktype {
-                        types.push(toktype);
-                        break 'kw true;
-                    }
-                }
-
-                token_len = 5;
-                if ident_slice.len() >= token_len {
-                    let toktype = match &ident_slice[..token_len] {
-                        kw::UNION => Some(TokenType::Union),
-                        kw::DEFER => Some(TokenType::Defer),
-                        kw::WHILE => Some(TokenType::While),
-                        kw::BREAK => Some(TokenType::Break),
-                        _ => None,
-                    };
-
-                    if let Some(toktype) = toktype {
-                        types.push(toktype);
-                        break 'kw true;
-                    }
-                }
-
-                token_len = 4;
-                if ident_slice.len() >= token_len {
-                    let toktype = match &ident_slice[..token_len] {
-                        kw::ENUM => Some(TokenType::Enum),
-                        kw::THEN => Some(TokenType::Then),
-                        kw::ELSE => Some(TokenType::Else),
-                        kw::LOOP => Some(TokenType::Loop),
-                        _ => None,
-                    };
-
-                    if let Some(toktype) = toktype {
-                        types.push(toktype);
-                        break 'kw true;
-                    }
-                }
-
-                token_len = 3;
-                if ident_slice.len() >= token_len {
-                    let toktype = match &ident_slice[..token_len] {
-                        kw::AND => Some(TokenType::And),
-                        kw::XOR => Some(TokenType::Xor),
-                        kw::NOT => Some(TokenType::Not),
-                        kw::PUB => Some(TokenType::Pub),
-                        _ => None,
-                    };
-
-                    if let Some(toktype) = toktype {
-                        types.push(toktype);
-                        break 'kw true;
-                    }
-                }
-
-                token_len = 2;
-                if ident_slice.len() >= token_len {
-                    let toktype = match &ident_slice[..token_len] {
-                        kw::OR => Some(TokenType::Or),
-                        kw::FN => Some(TokenType::Fn),
-                        kw::IF => Some(TokenType::If),
-                        kw::DO => Some(TokenType::Do),
-                        _ => None,
-                    };
-
-                    if let Some(toktype) = toktype {
-                        types.push(toktype);
-                        break 'kw true;
-                    }
-                }
-
-                false
-            };
-
-            if !is_keyword {
-                types.push(TokenType::Ident);
-            }
-
-            let slice = unsafe { std::str::from_utf8_unchecked(ident_slice) };
-            spans.push(TokenSpan { slice, line, col });
-            continue;
-        }
-
-        // ints
-        if input[0].is_ascii_digit() {
-            let start_ident_addr = input.as_ptr() as usize;
-
-            if input.starts_with(b"0x") {
-                // hex literals
-                input = &input[2..];
-                while matches!(input[0], b'_' | b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F') {
-                    input = &input[1..];
-                }
-            } else if input.starts_with(b"0o") {
-                // octal literals
-                input = &input[2..];
-                while matches!(input[0], b'_' | b'0'..=b'7') {
-                    input = &input[1..];
-                }
-            } else if input.starts_with(b"0b") {
-                // binary literals
-                input = &input[2..];
-                while matches!(input[0], b'_' | b'0'..=b'1') {
-                    input = &input[1..];
-                }
-            } else {
-                // decimal and floating literals
-
-                // whole part
+            // fractional part
+            if input[0] == b'.' {
                 input = &input[1..];
                 while matches!(input[0], b'_' | b'0'..=b'9') {
                     input = &input[1..];
                 }
-
-                // fractional part
-                if input[0] == b'.' {
-                    input = &input[1..];
-                    while matches!(input[0], b'_' | b'0'..=b'9') {
-                        input = &input[1..];
-                    }
-                }
-
-                // exponent
-                if matches!(input[0], b'e' | b'E') {
-                    input = &input[1..];
-                    if matches!(input[0], b'+' | b'-') {
-                        input = &input[1..];
-                    }
-                    while matches!(input[0], b'_' | b'0'..=b'9') {
-                        input = &input[1..];
-                    }
-                }
             }
 
-            let end_ident_addr = input.as_ptr() as usize;
-            let start = start_ident_addr - start_addr;
-            let end = end_ident_addr - start_addr;
-
-            types.push(TokenType::Num);
-            let col = bcode.as_ptr() as usize + start - line_start;
-            let slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
-            spans.push(TokenSpan { slice, line, col });
-            continue;
+            // exponent
+            if matches!(input[0], b'e' | b'E') {
+                input = &input[1..];
+                if matches!(input[0], b'+' | b'-') {
+                    input = &input[1..];
+                }
+                while matches!(input[0], b'_' | b'0'..=b'9') {
+                    input = &input[1..];
+                }
+            }
         }
 
-        let start_str_addr = input.as_ptr() as usize;
-        let col = start_str_addr + 1 - line_start;
-        panic!("{file_name}:{line}:{col}: Cannot parse token");
+        let end_ident_addr = input.as_ptr() as usize;
+        let start = start_ident_addr - start_addr;
+        let end = end_ident_addr - start_addr;
+
+        tokens.types.push(TokenType::Num);
+        let col = bcode.as_ptr() as usize + start - *line_start;
+        let slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
+        tokens.spans.push(TokenSpan::new(slice, *line, col));
+        return input;
     }
 
-    Tokens {
-        code,
-        line_breaks,
-        spans,
-        types,
-    }
+    let start_str_addr = input.as_ptr() as usize;
+    let col = start_str_addr + 1 - *line_start;
+    panic!("{file_name}:{line}:{col}: Cannot parse token");
 }
