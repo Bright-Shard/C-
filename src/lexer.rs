@@ -186,7 +186,7 @@ mod op {
     pub const R_BRACE: &[u8] = b"}";
 }
 
-pub fn tokenize<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
+pub fn lex<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
     let mut line = 1;
     let mut line_start = code.as_ptr() as usize;
 

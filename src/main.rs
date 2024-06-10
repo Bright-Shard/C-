@@ -1,8 +1,8 @@
-mod tokenizer;
+mod lexer;
 
 const CODE: &str = include_str!("../Cඞඞ.sus");
 
 fn main() {
-    let tokens = tokenizer::tokenize("Cඞඞ.sus", CODE);
+    let tokens = lexer::lex("Cඞඞ.sus", CODE);
     println!("{}", &tokens);
 }
