@@ -303,7 +303,7 @@ pub fn tokenize<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
             let mut is_valid = false;
 
             let start_str_addr = input.as_ptr() as usize;
-            input =  &input[prefix.len()..];
+            input = &input[prefix.len()..];
             while !input.is_empty() {
                 if input.starts_with(br#"\""#) {
                     input = &input[2..];
@@ -399,11 +399,11 @@ pub fn tokenize<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
         }
 
         // identifiers
-        if input[0].is_ascii_alphabetic() || input[0] == b'_' {
+        if matches!(input[0], b'_' | b'A'..=b'Z' | b'a'..=b'z') {
             let start_ident_addr = input.as_ptr() as usize;
 
             input = &input[1..];
-            while input[0].is_ascii_alphanumeric() || input[0] == b'_' {
+            while matches!(input[0], b'_' | b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9') {
                 input = &input[1..];
             }
 
@@ -522,23 +522,55 @@ pub fn tokenize<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
             continue;
         }
 
-        // numbers
+        // ints
         if input[0].is_ascii_digit() {
             let start_ident_addr = input.as_ptr() as usize;
 
-            // todo: support hex (0x), octal (0o) and binary (0b)
-            let mut has_point = false;
-            input = &input[1..];
-            while input[0].is_ascii_digit() || input[0] == b'.' {
+            if input.starts_with(b"0x") {
+                // hex literals
+                input = &input[2..];
+                while matches!(input[0], b'_' | b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F') {
+                    input = &input[1..];
+                }
+            } else if input.starts_with(b"0o") {
+                // octal literals
+                input = &input[2..];
+                while matches!(input[0], b'_' | b'0'..=b'7') {
+                    input = &input[1..];
+                }
+            } else if input.starts_with(b"0b") {
+                // binary literals
+                input = &input[2..];
+                while matches!(input[0], b'_' | b'0'..=b'1') {
+                    input = &input[1..];
+                }
+            } else {
+                // decimal and floating literals
+
+                // whole part
+                input = &input[1..];
+                while matches!(input[0], b'_' | b'0'..=b'9') {
+                    input = &input[1..];
+                }
+
+                // fractional part
                 if input[0] == b'.' {
-                    if has_point {
-                        break;
-                    } else {
-                        has_point = true;
+                    input = &input[1..];
+                    while matches!(input[0], b'_' | b'0'..=b'9') {
+                        input = &input[1..];
                     }
                 }
 
-                input = &input[1..];
+                // exponent
+                if matches!(input[0], b'e' | b'E') {
+                    input = &input[1..];
+                    if matches!(input[0], b'+' | b'-') {
+                        input = &input[1..];
+                    }
+                    while matches!(input[0], b'_' | b'0'..=b'9') {
+                        input = &input[1..];
+                    }
+                }
             }
 
             let end_ident_addr = input.as_ptr() as usize;
