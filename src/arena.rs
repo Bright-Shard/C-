@@ -73,7 +73,7 @@ mod unix {
     }
 
     pub unsafe fn os_page_size() -> usize {
-        return sysconf(SC_PAGE_SIZE) as usize;
+        sysconf(SC_PAGE_SIZE) as usize
     }
 }
 
@@ -164,6 +164,7 @@ impl Arena {
     }
 
     #[inline]
+    #[allow(clippy::mut_from_ref)]
     pub fn alloc<T>(&self, value: T) -> &mut T {
         unsafe {
             let ptr = self.alloc_region(mem::size_of::<T>(), mem::align_of::<T>()) as *mut T;
@@ -173,6 +174,7 @@ impl Arena {
     }
 
     #[inline]
+    #[allow(clippy::mut_from_ref)]
     pub fn alloc_slice<T>(&self, size: usize) -> &mut [T] {
         unsafe {
             let ptr = self.alloc_region(size * mem::size_of::<T>(), mem::align_of::<T>());
@@ -278,11 +280,11 @@ impl<T> Vector<T> {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &'_ T> {
-        self.as_slice().into_iter()
+        self.as_slice().iter()
     }
 
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &'_ mut T> {
-        self.as_mut_slice().into_iter()
+        self.as_mut_slice().iter_mut()
     }
 
     pub fn len(&self) -> usize {
