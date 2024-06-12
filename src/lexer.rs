@@ -1,4 +1,6 @@
-use std::fmt;
+use std::{fmt, mem};
+
+use crate::arena::{Vector, GIB};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TokenType {
@@ -91,11 +93,11 @@ pub struct Tokens<'a> {
     /// The entire code file
     pub code: &'a str,
     /// Sorted list containing the position of all line breaks
-    pub line_breaks: Vec<usize>,
+    pub line_breaks: Vector<usize>,
     /// Token spans in the code
-    pub spans: Vec<TokenSpan<'a>>,
+    pub spans: Vector<TokenSpan<'a>>,
     /// Respective token types
-    pub types: Vec<TokenType>,
+    pub types: Vector<TokenType>,
 }
 
 impl<'a> fmt::Display for Tokens<'a> {
@@ -190,11 +192,13 @@ pub fn lex<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
     let mut line = 1;
     let mut line_start = code.as_ptr() as usize;
 
+    let addr_space_size = 64 * GIB;
+
     let mut tokens = Tokens {
         code,
-        line_breaks: Vec::new(),
-        spans: Vec::new(),
-        types: Vec::new(),
+        line_breaks: Vector::new(addr_space_size / 8),
+        spans: Vector::new(addr_space_size),
+        types: Vector::new(addr_space_size / mem::size_of::<TokenSpan>()),
     };
 
     let bcode = tokens.code.as_bytes();
@@ -207,7 +211,7 @@ pub fn lex<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
 }
 
 /// Consume - in most cases - a single token.
-/// 
+///
 /// Exceptions are made for special nestings, like interpolated strings and
 /// pairs of tokens that indicate a beginning and an end like parentheses,
 /// in which case it will recurse.
@@ -224,7 +228,7 @@ fn consume_token<'a>(
     // save line breaks
     while !input.is_empty() && input[0] == b'\n' {
         let addr = input.as_ptr() as usize;
-        tokens.line_breaks.push(addr - start_addr);
+        tokens.line_breaks.add(addr - start_addr);
         input = &input[1..];
         *line_start = input.as_ptr() as usize;
         *line += 1;
@@ -269,7 +273,7 @@ fn consume_token<'a>(
                 };
 
                 if let Some(toktype) = toktype {
-                    tokens.types.push(toktype);
+                    tokens.types.add(toktype);
                     break 'op true;
                 }
             }
@@ -303,7 +307,7 @@ fn consume_token<'a>(
                 };
 
                 if let Some(toktype) = toktype {
-                    tokens.types.push(toktype);
+                    tokens.types.add(toktype);
                     break 'op true;
                 }
             }
@@ -314,7 +318,7 @@ fn consume_token<'a>(
         if is_operator {
             let col = input.as_ptr() as usize - *line_start;
             let slice = unsafe { std::str::from_utf8_unchecked(&input[..op_len]) };
-            tokens.spans.push(TokenSpan::new(slice, *line, col));
+            tokens.spans.add(TokenSpan::new(slice, *line, col));
             input = &input[op_len..];
             return input;
         }
@@ -344,13 +348,13 @@ fn consume_token<'a>(
                 let start = start_str_addr - start_addr;
                 let end = end_str_addr - start_addr;
 
-                tokens.types.push(match has_interpolation {
+                tokens.types.add(match has_interpolation {
                     true => TokenType::StringInterpEnd,
                     false => TokenType::String,
                 });
                 let col = bcode.as_ptr() as usize + start - *line_start;
                 let slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
-                tokens.spans.push(TokenSpan::new(slice, *line, col));
+                tokens.spans.add(TokenSpan::new(slice, *line, col));
                 break;
             } else if input[0] == b'{' {
                 // inside interpolated expression (we can consume tokens recursively)
@@ -361,13 +365,13 @@ fn consume_token<'a>(
                 let start = start_str_addr - start_addr;
                 let end = end_str_addr - start_addr;
 
-                tokens.types.push(match has_interpolation {
+                tokens.types.add(match has_interpolation {
                     true => TokenType::StringInterpMid,
                     false => TokenType::StringInterpBeg,
                 });
                 let col = bcode.as_ptr() as usize + start - *line_start;
                 let slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
-                tokens.spans.push(TokenSpan::new(slice, *line, col));
+                tokens.spans.add(TokenSpan::new(slice, *line, col));
 
                 has_interpolation = true;
 
@@ -384,7 +388,7 @@ fn consume_token<'a>(
                 // strings support line breaks
 
                 let addr = input.as_ptr() as usize;
-                tokens.line_breaks.push(addr - start_addr);
+                tokens.line_breaks.add(addr - start_addr);
                 input = &input[1..];
                 *line_start = input.as_ptr() as usize;
                 *line += 1;
@@ -433,7 +437,7 @@ fn consume_token<'a>(
             // strings support line breaks
             if input[0] == b'\n' {
                 let addr = input.as_ptr() as usize;
-                tokens.line_breaks.push(addr - start_addr);
+                tokens.line_breaks.add(addr - start_addr);
                 input = &input[1..];
                 *line_start = input.as_ptr() as usize;
                 *line += 1;
@@ -447,10 +451,10 @@ fn consume_token<'a>(
             let start = start_str_addr - start_addr;
             let end = end_str_addr - start_addr;
 
-            tokens.types.push(TokenType::String);
+            tokens.types.add(TokenType::String);
             let col = bcode.as_ptr() as usize + start - *line_start;
             let slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
-            tokens.spans.push(TokenSpan::new(slice, *line, col));
+            tokens.spans.add(TokenSpan::new(slice, *line, col));
             return input;
         } else {
             let col = start_str_addr + 1 - *line_start;
@@ -487,7 +491,7 @@ fn consume_token<'a>(
             // chars can handle line breaks (though they shouldn't be allowed)
             if input[0] == b'\n' {
                 let addr = input.as_ptr() as usize;
-                tokens.line_breaks.push(addr - start_addr);
+                tokens.line_breaks.add(addr - start_addr);
                 input = &input[1..];
                 *line_start = input.as_ptr() as usize;
                 *line += 1;
@@ -501,10 +505,10 @@ fn consume_token<'a>(
             let start = start_str_addr - start_addr;
             let end = end_str_addr - start_addr;
 
-            tokens.types.push(TokenType::Char);
+            tokens.types.add(TokenType::Char);
             let col = bcode.as_ptr() as usize + start - *line_start;
             let slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
-            tokens.spans.push(TokenSpan::new(slice, *line, col));
+            tokens.spans.add(TokenSpan::new(slice, *line, col));
             return input;
         } else {
             let col = start_str_addr + 1 - *line_start;
@@ -541,7 +545,7 @@ fn consume_token<'a>(
                 };
 
                 if let Some(toktype) = toktype {
-                    tokens.types.push(toktype);
+                    tokens.types.add(toktype);
                     break 'kw true;
                 }
             }
@@ -555,7 +559,7 @@ fn consume_token<'a>(
                 };
 
                 if let Some(toktype) = toktype {
-                    tokens.types.push(toktype);
+                    tokens.types.add(toktype);
                     break 'kw true;
                 }
             }
@@ -571,7 +575,7 @@ fn consume_token<'a>(
                 };
 
                 if let Some(toktype) = toktype {
-                    tokens.types.push(toktype);
+                    tokens.types.add(toktype);
                     break 'kw true;
                 }
             }
@@ -587,7 +591,7 @@ fn consume_token<'a>(
                 };
 
                 if let Some(toktype) = toktype {
-                    tokens.types.push(toktype);
+                    tokens.types.add(toktype);
                     break 'kw true;
                 }
             }
@@ -603,7 +607,7 @@ fn consume_token<'a>(
                 };
 
                 if let Some(toktype) = toktype {
-                    tokens.types.push(toktype);
+                    tokens.types.add(toktype);
                     break 'kw true;
                 }
             }
@@ -619,7 +623,7 @@ fn consume_token<'a>(
                 };
 
                 if let Some(toktype) = toktype {
-                    tokens.types.push(toktype);
+                    tokens.types.add(toktype);
                     break 'kw true;
                 }
             }
@@ -628,11 +632,11 @@ fn consume_token<'a>(
         };
 
         if !is_keyword {
-            tokens.types.push(TokenType::Ident);
+            tokens.types.add(TokenType::Ident);
         }
 
         let slice = unsafe { std::str::from_utf8_unchecked(ident_slice) };
-        tokens.spans.push(TokenSpan::new(slice, *line, col));
+        tokens.spans.add(TokenSpan::new(slice, *line, col));
         return input;
     }
 
@@ -691,17 +695,17 @@ fn consume_token<'a>(
         let start = start_ident_addr - start_addr;
         let end = end_ident_addr - start_addr;
 
-        tokens.types.push(TokenType::Num);
+        tokens.types.add(TokenType::Num);
         let col = bcode.as_ptr() as usize + start - *line_start;
         let slice = unsafe { std::str::from_utf8_unchecked(&bcode[start..end]) };
-        tokens.spans.push(TokenSpan::new(slice, *line, col));
+        tokens.spans.add(TokenSpan::new(slice, *line, col));
         return input;
     }
 
     // Special recursions (parentheses, etc.)
     if input[0] == b'(' {
         let start_str_addr = input.as_ptr() as usize;
-        
+
         while !input.is_empty() && input[0] != b')' {
             input = consume_token(file_name, input, line, line_start, tokens);
         }
@@ -711,7 +715,7 @@ fn consume_token<'a>(
         }
     } else if input[0] == b'[' {
         let start_str_addr = input.as_ptr() as usize;
-        
+
         while !input.is_empty() && input[0] != b']' {
             input = consume_token(file_name, input, line, line_start, tokens);
         }
@@ -721,7 +725,7 @@ fn consume_token<'a>(
         }
     } else if input[0] == b'{' {
         let start_str_addr = input.as_ptr() as usize;
-        
+
         while !input.is_empty() && input[0] != b'}' {
             input = consume_token(file_name, input, line, line_start, tokens);
         }

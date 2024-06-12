@@ -1,3 +1,4 @@
+mod arena;
 mod lexer;
 
 const CODE: &str = include_str!("../Cඞඞ.sus");
