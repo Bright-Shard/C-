@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-#[cfg(target_family = "unix")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 mod unix {
     use std::{
         ffi::{c_int, c_long, c_void},
@@ -79,7 +79,49 @@ mod unix {
 
 #[cfg(target_family = "windows")]
 mod windows {
-    use std::ffi::c_void;
+    use std::{
+        ffi::{c_int, c_void},
+        ptr,
+    };
+
+    const MEM_COMMIT: u32 = 0x00001000;
+    const MEM_RESERVE: u32 = 0x00002000;
+
+    const MEM_DECOMMIT: u32 = 0x00004000;
+    const MEM_RELEASE: u32 = 0x00008000;
+
+    const PAGE_NOACCESS: u32 = 0x01;
+    const PAGE_READWRITE: u32 = 0x04;
+
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    #[allow(non_snake_case)]
+    pub struct DummyStructW {
+        pub wProcessorArchitecture: u16,
+        pub wReserved: u16,
+    }
+
+    #[repr(C)]
+    #[allow(non_snake_case)]
+    pub union DummySystemInfoUnion {
+        pub dwOemId: u32,
+        pub dummy: DummyStructW,
+    }
+
+    #[repr(C)]
+    #[allow(non_snake_case)]
+    pub struct SystemInfo {
+        pub dummy: DummySystemInfoUnion,
+        pub dwPageSize: u32,
+        pub lpMinimumApplicationAddress: *const c_void,
+        pub lpMaximumApplicationAddress: *const c_void,
+        pub dwActiveProcessorMask: *const u32,
+        pub dwNumberOfProcessors: u32,
+        pub dwProcessorType: u32,
+        pub dwAllocationGranularity: u32,
+        pub wProcessorLevel: u16,
+        pub wProcessorRevision: u16,
+    }
 
     extern "C" {
         pub fn VirtualAlloc(
@@ -90,28 +132,47 @@ mod windows {
         ) -> *mut c_void;
 
         pub fn VirtualFree(lpAddress: *mut c_void, dwSize: usize, dwFreeType: u32) -> bool;
+
+        pub fn GetSystemInfo(lpSystemInfo: &mut SystemInfo);
     }
 
     pub unsafe fn vm_reserve(size_aligned: usize) -> *mut u8 {
-        compile_error!("No vm_reserve on Windows yet")
+        VirtualAlloc(ptr::null_mut(), size_aligned, MEM_RESERVE, PAGE_NOACCESS) as _
     }
 
-    pub unsafe fn vm_release(addr: *mut u8, size_aligned: usize) {
-        compile_error!("No vm_release on Windows yet")
+    pub unsafe fn vm_release(addr: *const u8, size_aligned: usize) {
+        VirtualFree(addr as _, size_aligned, MEM_RELEASE);
     }
 
-    pub unsafe fn vm_commit(addr: *mut u8, size_aligned: usize) {
-        compile_error!("No vm_commit on Windows yet")
+    pub unsafe fn vm_commit(addr: *const u8, size_aligned: usize) {
+        VirtualAlloc(addr as _, size_aligned, MEM_COMMIT, PAGE_READWRITE);
     }
 
-    pub unsafe fn vm_uncommit(addr: *mut u8, size_aligned: usize) {
-        compile_error!("No vm_uncommit on Windows yet")
+    pub unsafe fn vm_uncommit(addr: *const u8, size_aligned: usize) {
+        VirtualFree(addr as _, size_aligned, MEM_DECOMMIT);
     }
 
     pub unsafe fn os_page_size() -> usize {
-        compile_error!("No os_page_size on Windows yet")
+        let mut system_info = SystemInfo {
+            dummy: DummySystemInfoUnion { dwOemId: 0 },
+            dwPageSize: 0,
+            lpMinimumApplicationAddress: ptr::null(),
+            lpMaximumApplicationAddress: ptr::null(),
+            dwActiveProcessorMask: ptr::null(),
+            dwNumberOfProcessors: 0,
+            dwProcessorType: 0,
+            dwAllocationGranularity: 0,
+            wProcessorLevel: 0,
+            wProcessorRevision: 0,
+        };
+
+        GetSystemInfo(&mut system_info);
+        system_info.dwPageSize as usize
     }
 }
+
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_family = "windows")))]
+compile_error!("Operating system not supported");
 
 use std::{
     cell::Cell,
