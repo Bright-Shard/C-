@@ -233,13 +233,14 @@ fn consume_token<'a>(
         *line_start = input.as_ptr() as usize;
         *line += 1;
     }
-    if input.is_empty() {
-        return input;
-    }
 
     // ignore whitespace
-    while input[0].is_ascii_whitespace() {
+    while !input.is_empty() && input[0].is_ascii_whitespace() {
         input = &input[1..];
+    }
+
+    if input.is_empty() {
+        return input;
     }
 
     // ignore comments
