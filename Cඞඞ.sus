@@ -54,20 +54,19 @@
 WindowFlags :: packed struct u32
 {
     centered    : bool,
-    Resizable   : bool,
-    Maximized   : bool,
-    Transparent : bool,
-    HighDpi     : bool,
+    resizable   : bool,
+    maximized   : bool,
+    transparent : bool,
+    highDpi     : bool,
 }
 
 // built-in enums (type-checked ADTs)
-// how can I consistently specify the tag value here?
 KeyboardEvent :: enum u8
 {
-    KeyPress   : KeyCode,
-    KeyRelease : KeyCode,
-    KeyRepeat  : KeyCode,
-    ImeCommit  : String,
+    KeyPress   : KeyCode = 0,
+    KeyRelease : KeyCode = 1,
+    KeyRepeat  : KeyCode = 2,
+    ImeCommit  : String  = 3,
 }
 
 // by default, every variant is of type ()
