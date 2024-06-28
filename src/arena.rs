@@ -60,15 +60,15 @@ mod unix {
         reserved
     }
 
-    pub unsafe fn vm_release(addr: *const u8, size_aligned: usize) {
+    pub unsafe fn vm_release(addr: *mut u8, size_aligned: usize) {
         munmap(addr as _, size_aligned);
     }
 
-    pub unsafe fn vm_commit(addr: *const u8, size_aligned: usize) {
+    pub unsafe fn vm_commit(addr: *mut u8, size_aligned: usize) {
         mprotect(addr as _, size_aligned, PROT_READ | PROT_WRITE);
     }
 
-    pub unsafe fn vm_uncommit(addr: *const u8, size_aligned: usize) {
+    pub unsafe fn vm_uncommit(addr: *mut u8, size_aligned: usize) {
         mprotect(addr as _, size_aligned, PROT_NONE);
     }
 
@@ -140,15 +140,15 @@ mod windows {
         VirtualAlloc(ptr::null_mut(), size_aligned, MEM_RESERVE, PAGE_NOACCESS) as _
     }
 
-    pub unsafe fn vm_release(addr: *const u8, size_aligned: usize) {
+    pub unsafe fn vm_release(addr: *mut u8, size_aligned: usize) {
         VirtualFree(addr as _, size_aligned, MEM_RELEASE);
     }
 
-    pub unsafe fn vm_commit(addr: *const u8, size_aligned: usize) {
+    pub unsafe fn vm_commit(addr: *mut u8, size_aligned: usize) {
         VirtualAlloc(addr as _, size_aligned, MEM_COMMIT, PAGE_READWRITE);
     }
 
-    pub unsafe fn vm_uncommit(addr: *const u8, size_aligned: usize) {
+    pub unsafe fn vm_uncommit(addr: *mut u8, size_aligned: usize) {
         VirtualFree(addr as _, size_aligned, MEM_DECOMMIT);
     }
 
@@ -197,9 +197,9 @@ pub const GIB: usize = 1024 * MIB;
 pub const TIB: usize = 1024 * GIB;
 
 pub struct Arena {
-    base_addr: *const u8,
-    end_addr: *const u8,
-    bump_addr: Cell<*const u8>,
+    base_addr: *mut u8,
+    end_addr: *mut u8,
+    bump_addr: Cell<*mut u8>,
 }
 
 impl Arena {
@@ -207,7 +207,7 @@ impl Arena {
         unsafe {
             let addr_space_size = ceil_align(addr_space_size, os_page_size());
 
-            let base_addr = vm_reserve(addr_space_size).cast_const();
+            let base_addr = vm_reserve(addr_space_size);
             let end_addr = base_addr.byte_add(addr_space_size);
             let bump_addr = Cell::new(base_addr);
 
@@ -265,7 +265,7 @@ impl Arena {
 
         self.bump_addr.set(next_bump_addr);
 
-        addr.cast_mut()
+        addr
     }
 
     pub fn free_all(&mut self) {
@@ -280,8 +280,8 @@ impl Arena {
 }
 
 #[inline]
-unsafe fn ceil_align_ptr<T>(ptr: *const T, to: usize) -> *const T {
-    ceil_align(ptr as usize, to) as *const T
+unsafe fn ceil_align_ptr<T>(ptr: *mut T, to: usize) -> *mut T {
+    ceil_align(ptr as usize, to) as *mut T
 }
 
 #[inline]
