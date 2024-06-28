@@ -279,6 +279,14 @@ impl Arena {
     }
 }
 
+impl Drop for Arena {
+    fn drop(&mut self) {
+        unsafe {
+            vm_release(self.base_addr, self.end_addr.offset_from(self.base_addr) as usize);
+        }
+    }
+}
+
 #[inline]
 unsafe fn ceil_align_ptr<T>(ptr: *mut T, to: usize) -> *mut T {
     ceil_align(ptr as usize, to) as *mut T
