@@ -293,12 +293,12 @@ fn ceil_align(value: usize, to: usize) -> usize {
 // vector
 
 /// A very rudimentary dynamic array backed by an arena.
-pub struct Vector<T> {
+pub struct ArenaVec<T> {
     arena: Arena,
     _data: PhantomData<T>,
 }
 
-impl<T> Vector<T> {
+impl<T> ArenaVec<T> {
     pub fn new(addr_space_size: usize) -> Self {
         Self {
             arena: Arena::new(addr_space_size),
@@ -362,7 +362,7 @@ impl<T> Vector<T> {
     }
 }
 
-impl<T> Index<usize> for Vector<T> {
+impl<T> Index<usize> for ArenaVec<T> {
     type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -374,7 +374,7 @@ impl<T> Index<usize> for Vector<T> {
     }
 }
 
-impl<T> IndexMut<usize> for Vector<T> {
+impl<T> IndexMut<usize> for ArenaVec<T> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         let len = self.len();
 
@@ -389,7 +389,7 @@ impl<T> IndexMut<usize> for Vector<T> {
     }
 }
 
-impl<T: Debug> fmt::Debug for Vector<T> {
+impl<T: Debug> fmt::Debug for ArenaVec<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_list().entries(self.iter()).finish()
     }

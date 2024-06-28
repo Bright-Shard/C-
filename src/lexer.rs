@@ -1,6 +1,6 @@
 use std::{fmt, mem};
 
-use crate::arena::{Vector, GIB};
+use crate::arena::{ArenaVec, GIB};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TokenType {
@@ -93,11 +93,11 @@ pub struct Tokens<'a> {
     /// The entire code file
     pub code: &'a str,
     /// Sorted list containing the position of all line breaks
-    pub line_breaks: Vector<usize>,
+    pub line_breaks: ArenaVec<usize>,
     /// Token spans in the code
-    pub spans: Vector<TokenSpan<'a>>,
+    pub spans: ArenaVec<TokenSpan<'a>>,
     /// Respective token types
-    pub types: Vector<TokenType>,
+    pub types: ArenaVec<TokenType>,
 }
 
 impl<'a> fmt::Display for Tokens<'a> {
@@ -196,9 +196,9 @@ pub fn lex<'a>(file_name: &str, code: &'a str) -> Tokens<'a> {
 
     let mut tokens = Tokens {
         code,
-        line_breaks: Vector::new(addr_space_size / 8),
-        spans: Vector::new(addr_space_size),
-        types: Vector::new(addr_space_size / mem::size_of::<TokenSpan>()),
+        line_breaks: ArenaVec::new(addr_space_size / 8),
+        spans: ArenaVec::new(addr_space_size),
+        types: ArenaVec::new(addr_space_size / mem::size_of::<TokenSpan>()),
     };
 
     let bcode = tokens.code.as_bytes();
