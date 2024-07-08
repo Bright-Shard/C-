@@ -175,12 +175,13 @@ mod windows {
 compile_error!("Operating system not supported");
 
 use std::{
-    cell::Cell,
+    cell::{Cell, OnceCell},
     fmt::{self, Debug},
     marker::PhantomData,
     mem,
     ops::{Index, IndexMut},
     slice,
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 #[cfg(target_family = "unix")]
@@ -188,6 +189,18 @@ use unix::*;
 
 #[cfg(target_family = "windows")]
 use windows::*;
+
+fn page_size() -> usize {
+    static mut PAGE_SIZE: usize = 0;
+
+    unsafe {
+        if PAGE_SIZE == 0 {
+            PAGE_SIZE = os_page_size();
+        }
+
+        PAGE_SIZE
+    }
+}
 
 const PAGES_PER_COMMIT: usize = 16;
 
@@ -199,6 +212,7 @@ pub const TIB: usize = 1024 * GIB;
 pub struct Arena {
     base_addr: *mut u8,
     end_addr: *mut u8,
+    page_size: usize,
     uncommitted_addr: Cell<*mut u8>,
     bump_addr: Cell<*mut u8>,
 }
@@ -206,7 +220,8 @@ pub struct Arena {
 impl Arena {
     pub fn new(addr_space_size: usize) -> Self {
         unsafe {
-            let addr_space_size = ceil_align(addr_space_size, os_page_size());
+            let page_size = page_size();
+            let addr_space_size = ceil_align(addr_space_size, page_size);
 
             let base_addr = vm_reserve(addr_space_size);
             let end_addr = base_addr.byte_add(addr_space_size);
@@ -216,6 +231,7 @@ impl Arena {
             Arena {
                 base_addr,
                 end_addr,
+                page_size,
                 uncommitted_addr,
                 bump_addr,
             }
@@ -223,8 +239,8 @@ impl Arena {
     }
 
     #[inline]
-    fn alloc_granularity() -> usize {
-        unsafe { os_page_size() * PAGES_PER_COMMIT }
+    fn alloc_granularity(&self) -> usize {
+        unsafe { self.page_size * PAGES_PER_COMMIT }
     }
 
     #[inline]
@@ -256,7 +272,7 @@ impl Arena {
 
         // commit pages we don't have yet
         if next_bump_addr >= self.uncommitted_addr.get() {
-            let alloc_granularity = Self::alloc_granularity();
+            let alloc_granularity = self.alloc_granularity();
             let uncommit_end_addr = ceil_align_ptr(next_bump_addr, alloc_granularity);
             let commit_size = uncommit_end_addr.offset_from(self.uncommitted_addr.get()) as usize;
             vm_commit(self.uncommitted_addr.get(), commit_size);
@@ -270,7 +286,7 @@ impl Arena {
 
     pub fn free_all(&mut self) {
         unsafe {
-            let uncommitted_addr = ceil_align_ptr(self.bump_addr.get(), Self::alloc_granularity());
+            let uncommitted_addr = ceil_align_ptr(self.bump_addr.get(), self.alloc_granularity());
             let uncommit_size = uncommitted_addr.offset_from(self.base_addr) as usize;
             vm_uncommit(self.base_addr, uncommit_size);
         }
@@ -282,7 +298,10 @@ impl Arena {
 impl Drop for Arena {
     fn drop(&mut self) {
         unsafe {
-            vm_release(self.base_addr, self.end_addr.offset_from(self.base_addr) as usize);
+            vm_release(
+                self.base_addr,
+                self.end_addr.offset_from(self.base_addr) as usize,
+            );
         }
     }
 }
