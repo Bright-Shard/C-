@@ -199,6 +199,7 @@ pub const TIB: usize = 1024 * GIB;
 pub struct Arena {
     base_addr: *mut u8,
     end_addr: *mut u8,
+    uncommitted_addr: Cell<*mut u8>,
     bump_addr: Cell<*mut u8>,
 }
 
@@ -209,11 +210,13 @@ impl Arena {
 
             let base_addr = vm_reserve(addr_space_size);
             let end_addr = base_addr.byte_add(addr_space_size);
+            let uncommitted_addr = Cell::new(base_addr);
             let bump_addr = Cell::new(base_addr);
 
             Arena {
                 base_addr,
                 end_addr,
+                uncommitted_addr,
                 bump_addr,
             }
         }
@@ -247,20 +250,17 @@ impl Arena {
         let addr = ceil_align_ptr(self.bump_addr.get(), align);
         let next_bump_addr = addr.byte_add(size);
 
-        if next_bump_addr > self.end_addr {
-            panic!("Arena is out of memory");
-        }
+        // if next_bump_addr > self.end_addr {
+        //     panic!("Arena is out of memory");
+        // }
 
         // commit pages we don't have yet
-        {
+        if next_bump_addr >= self.uncommitted_addr.get() {
             let alloc_granularity = Self::alloc_granularity();
-            let uncommitted_addr = ceil_align_ptr(self.bump_addr.get(), alloc_granularity);
-
-            if next_bump_addr >= uncommitted_addr {
-                let unaligned_commit_size = next_bump_addr.offset_from(uncommitted_addr) as usize;
-                let commit_size = ceil_align(unaligned_commit_size, alloc_granularity);
-                vm_commit(uncommitted_addr, commit_size);
-            }
+            let uncommit_end_addr = ceil_align_ptr(next_bump_addr, alloc_granularity);
+            let commit_size = uncommit_end_addr.offset_from(self.uncommitted_addr.get()) as usize;
+            vm_commit(self.uncommitted_addr.get(), commit_size);
+            self.uncommitted_addr.set(uncommit_end_addr);
         }
 
         self.bump_addr.set(next_bump_addr);
@@ -292,10 +292,10 @@ unsafe fn ceil_align_ptr<T>(ptr: *mut T, to: usize) -> *mut T {
     ceil_align(ptr as usize, to) as *mut T
 }
 
+/// Ceil-aligns the value. Assumes a power of 2.
 #[inline]
 fn ceil_align(value: usize, to: usize) -> usize {
-    let aligned = value + to - 1;
-    aligned - aligned % to
+    (value as isize + (-(value as isize) & (to as isize - 1))) as usize
 }
 
 // vector
@@ -400,5 +400,39 @@ impl<T> IndexMut<usize> for ArenaVec<T> {
 impl<T: Debug> fmt::Debug for ArenaVec<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_list().entries(self.iter()).finish()
+    }
+}
+
+#[cfg(test)]
+mod tests_ceil_align {
+    use crate::arena::ceil_align;
+
+    #[test]
+    fn correct_8() {
+        assert_eq!(ceil_align(0, 8), 0);
+        assert_eq!(ceil_align(1, 8), 8);
+        assert_eq!(ceil_align(2, 8), 8);
+        assert_eq!(ceil_align(3, 8), 8);
+        assert_eq!(ceil_align(4, 8), 8);
+        assert_eq!(ceil_align(5, 8), 8);
+        assert_eq!(ceil_align(6, 8), 8);
+        assert_eq!(ceil_align(7, 8), 8);
+        assert_eq!(ceil_align(8, 8), 8);
+        assert_eq!(ceil_align(9, 8), 16);
+    }
+
+    #[test]
+    fn correct_16() {
+        assert_eq!(ceil_align(0, 16), 0);
+        assert_eq!(ceil_align(1, 16), 16);
+        assert_eq!(ceil_align(2, 16), 16);
+        assert_eq!(ceil_align(3, 16), 16);
+        assert_eq!(ceil_align(4, 16), 16);
+        assert_eq!(ceil_align(5, 16), 16);
+        assert_eq!(ceil_align(15, 16), 16);
+        assert_eq!(ceil_align(16, 16), 16);
+        assert_eq!(ceil_align(17, 16), 32);
+        assert_eq!(ceil_align(18, 16), 32);
+        assert_eq!(ceil_align(19, 16), 32);
     }
 }
